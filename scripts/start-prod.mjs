@@ -57,7 +57,11 @@ const child = spawn(
   [nextBin, "start", "-H", host, "-p", String(port)],
   {
     stdio: "inherit",
-    env: process.env,
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV || "production",
+      HOST: host,
+    },
   },
 );
 

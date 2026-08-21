@@ -3,10 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { nextCli, npmCommand } from "./node-paths.mjs";
 
-function run(command, args) {
+function run(command, args, env = process.env) {
   const result = spawnSync(command, args, {
     stdio: "inherit",
-    env: process.env,
+    env,
     shell: false,
   });
   if (result.error) {
@@ -17,16 +17,15 @@ function run(command, args) {
   }
 }
 
+function hasBuildDependency(nameParts) {
+  return fs.existsSync(path.join(process.cwd(), "node_modules", ...nameParts));
+}
+
 function ensureDependencies() {
-  const nextPath = path.join(
-    process.cwd(),
-    "node_modules",
-    "next",
-    "dist",
-    "bin",
-    "next",
-  );
-  if (fs.existsSync(nextPath)) {
+  const hasNext = hasBuildDependency(["next", "dist", "bin", "next"]);
+  const hasTailwindPostcss = hasBuildDependency(["@tailwindcss", "postcss"]);
+  const hasTypescript = hasBuildDependency(["typescript"]);
+  if (hasNext && hasTailwindPostcss && hasTypescript) {
     return;
   }
 
@@ -37,11 +36,19 @@ function ensureDependencies() {
     );
   }
 
-  console.log(`[build] installing dependencies with ${npm}`);
+  const installEnv = {
+    ...process.env,
+    NODE_ENV: "development",
+    NPM_CONFIG_PRODUCTION: "false",
+  };
+
+  console.log(
+    `[build] installing with devDependencies (NODE_ENV was ${process.env.NODE_ENV ?? "unset"})`,
+  );
   if (npm.endsWith("npm-cli.js")) {
-    run(process.execPath, [npm, "install"]);
+    run(process.execPath, [npm, "install", "--include=dev"], installEnv);
   } else {
-    run(npm, ["install"]);
+    run(npm, ["install", "--include=dev"], installEnv);
   }
 }
 

@@ -7,5 +7,4 @@ build = ["node", "scripts/build-prod.mjs"]
 run = ["node", "scripts/start-prod.mjs"]
 
 [env]
-NODE_ENV = "production"
 HOST = "0.0.0.0"
