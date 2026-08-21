@@ -1,9 +1,10 @@
-run = "npm run start:prod"
+run = "node scripts/start-prod.mjs"
+modules = ["nodejs-20"]
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start:prod"]
+build = ["node", "scripts/build-prod.mjs"]
+run = ["node", "scripts/start-prod.mjs"]
 
 [env]
 NODE_ENV = "production"

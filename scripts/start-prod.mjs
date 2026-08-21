@@ -1,6 +1,6 @@
-import http from "node:http";
-import path from "node:path";
 import { spawn } from "node:child_process";
+import http from "node:http";
+import { nextCli } from "./node-paths.mjs";
 
 const host = process.env.HOST ?? "0.0.0.0";
 const port = process.env.PORT ?? "3000";
@@ -50,14 +50,7 @@ if (process.env.REPL_ID) {
   startHealthSidecar();
 }
 
-const nextBin = path.join(
-  process.cwd(),
-  "node_modules",
-  "next",
-  "dist",
-  "bin",
-  "next",
-);
+const nextBin = nextCli();
 
 const child = spawn(
   process.execPath,

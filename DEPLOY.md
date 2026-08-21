@@ -40,7 +40,7 @@ Supabase SQL Editor에서 `supabase/apply-all-migrations.sql`을 한 번 실행�
 ```bash
 git add -A
 git status
-git commit -m "변경 내용을 한 줄로"
+git commit -m "배포수정"
 git push origin main
 ```
 
@@ -84,23 +84,26 @@ git init
 git remote add origin https://github.com/plzkanu/hr_info.git
 ```
 
-연결한 뒤 코드 받기 + 빌드:
+연결한 뒤 코드 받기 + 빌드 (Shell에 npm이 있으면):
 
 ```bash
-git fetch origin main && git reset --hard origin/main && npm install && npm run build
+git fetch origin main && git reset --hard origin/main && npm install && node scripts/build-prod.mjs
 ```
 
-빌드가 끝나면:
+게시 환경처럼 npm 없이 맞추려면:
 
 ```bash
-npm run start:prod
+git fetch origin main && git reset --hard origin/main
+node scripts/build-prod.mjs
+node scripts/start-prod.mjs
 ```
 
 ### 매번 배포할 때 (origin이 이미 있을 때)
 
 ```bash
-git fetch origin main && git reset --hard origin/main && npm install && npm run build
-npm run start:prod
+git fetch origin main && git reset --hard origin/main
+node scripts/build-prod.mjs
+node scripts/start-prod.mjs
 ```
 
 `reset --hard`는 Replit에만 있는 로컬 수정이 지워집니다. GitHub `main`과 똑같이 맞출 때 씁니다.
@@ -134,18 +137,24 @@ Replit 프록시에서 `/hr-api`가 다른 API 서버가 아니라 **이 Next.js
 Replit Publish가 `healthcheck /internal-api` 또는 `healthcheck /` 에서 500·connection refused를 내면, 예전 `api-server`(포트 1104)를 보고 있는 겁니다. 이 앱은 Next.js이며 `artifacts/api-server`가 아닙니다.
 
 1. GitHub 최신 `main`을 받은 뒤 `npm run build`까지 다시 합니다.
-2. 실행은 **반드시** Next.js 운영 스크립트입니다. 예전 `api-server`가 아닙니다.
+2. 실행은 **npm을 호출하지 않습니다.** 게시 환경에서 `spawn npm ENOENT`가 나지 않게 Node로 직접 띄웁니다.
 
 ```bash
-npm run start:prod
+node scripts/build-prod.mjs
+node scripts/start-prod.mjs
 ```
+
+`.replit` 배포 설정도 동일합니다.
+
+- build: `node scripts/build-prod.mjs`
+- run: `node scripts/start-prod.mjs`
 
 이 스크립트는 Next.js를 `$PORT`에 띄우고, Replit 헬스체크용으로 `127.0.0.1:1104`에서 `/internal-api`에 200을 줍니다.
 
 3. Replit **Publish / Deployment** 설정에서
-   - Run command: `npm run start:prod`
+   - Build command: `node scripts/build-prod.mjs` (`npm run build` 아님)
+   - Run command: `node scripts/start-prod.mjs` (`npm run start:prod` 아님)
    - Health check path: `/internal-api`
-   - 포트 충돌이 나면 예전 api-server 프로세스를 먼저 종료합니다.
 4. Replit Secrets의 `SUPABASE_SSL_VERIFY`는 **빼는 것**을 권장합니다. 공개 Replit에서는 필요 없고, 로그에 `NODE_TLS_REJECT_UNAUTHORIZED` 경고가 납니다.
 
 헬스체크가 통과하는 주소:
@@ -182,8 +191,9 @@ Replit Shell에서:
 
 ```bash
 git remote add origin https://github.com/plzkanu/hr_info.git
-git fetch origin main && git reset --hard origin/main && npm install && npm run build
-npm run start:prod
+git fetch origin main && git reset --hard origin/main
+node scripts/build-prod.mjs
+node scripts/start-prod.mjs
 ```
 
 `origin`이 이미 있으면 `git remote add` 줄은 건너뛰거나, 주소만 고칠 때 `git remote set-url origin https://github.com/plzkanu/hr_info.git` 을 씁니다.

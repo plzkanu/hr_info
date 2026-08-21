@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:prod": "node scripts/build-prod.mjs",
     "start": "next start --hostname 0.0.0.0",
     "start:prod": "node scripts/start-prod.mjs",
     "lint": "eslint"
