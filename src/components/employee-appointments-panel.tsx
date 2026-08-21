@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Employee, EmployeeAppointment } from "@/lib/types";
+import { hrApi } from "@/lib/hr-api";
 
 interface EmployeeAppointmentsPanelProps {
   employee: Employee;
@@ -24,7 +25,7 @@ export function EmployeeAppointmentsPanel({
         const params = new URLSearchParams({ empNo: employee.empNo });
         if (employee.companyCode) params.set("company", employee.companyCode);
         const response = await fetch(
-          `/api/employees/appointments?${params.toString()}`,
+          `${hrApi("/employees/appointments")}?${params.toString()}`,
         );
         const data = (await response.json()) as {
           appointments?: EmployeeAppointment[];

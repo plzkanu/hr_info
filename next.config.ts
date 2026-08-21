@@ -24,6 +24,7 @@ function getLocalNetworkOrigins(): string[] {
 }
 
 const nextConfig: NextConfig = {
+  // Replit에서 다른 앱이 `/api`를 선점하므로 HR API는 `/hr-api`를 사용합니다.
   ...(process.env.NODE_ENV === "development"
     ? { allowedDevOrigins: getLocalNetworkOrigins() }
     : {}),

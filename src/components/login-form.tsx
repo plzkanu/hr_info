@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ForcePasswordChangeModal } from "@/components/force-password-change-modal";
+import { hrApi } from "@/lib/hr-api";
 
 export function LoginForm() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(hrApi("/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

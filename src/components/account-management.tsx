@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { UserPublic, UserRole } from "@/lib/types";
+import { hrApi } from "@/lib/hr-api";
 import {
   FEATURE_PERMISSIONS,
   permissionLabel,
@@ -63,7 +64,7 @@ export function AccountManagement({ currentUserId }: AccountManagementProps) {
     setIsLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/users");
+      const response = await fetch(hrApi("/users"));
       const data = (await response.json()) as {
         users?: UserPublic[];
         error?: string;
@@ -117,7 +118,7 @@ export function AccountManagement({ currentUserId }: AccountManagementProps) {
 
     try {
       if (formMode === "create") {
-        const response = await fetch("/api/users", {
+        const response = await fetch(hrApi("/users"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -147,7 +148,7 @@ export function AccountManagement({ currentUserId }: AccountManagementProps) {
           });
         }
       } else if (formMode === "edit" && editingId) {
-        const response = await fetch(`/api/users/${editingId}`, {
+        const response = await fetch(hrApi(`/users/${editingId}`), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -187,7 +188,7 @@ export function AccountManagement({ currentUserId }: AccountManagementProps) {
 
     setError("");
     try {
-      const response = await fetch(`/api/users/${user.id}/reset-password`, {
+      const response = await fetch(hrApi(`/users/${user.id}/reset-password`), {
         method: "POST",
       });
       const data = (await response.json()) as {
@@ -217,7 +218,7 @@ export function AccountManagement({ currentUserId }: AccountManagementProps) {
 
     setError("");
     try {
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await fetch(hrApi(`/users/${user.id}`), {
         method: "DELETE",
       });
       const data = (await response.json()) as { error?: string };

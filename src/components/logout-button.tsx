@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { hrApi } from "@/lib/hr-api";
 
 export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -10,7 +11,7 @@ export function LogoutButton({ className }: { className?: string }) {
   async function handleLogout() {
     setIsLoading(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch(hrApi("/auth/logout"), { method: "POST" });
     } finally {
       router.push("/login");
       router.refresh();

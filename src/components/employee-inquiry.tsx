@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { EmployeeDetailModal } from "@/components/employee-detail-modal";
 import { todayIsoDate } from "@/lib/format";
 import { COMPANY_CODES, COMPANY_ROSTER_TABLE, parseCompanyFilter, type CompanyFilter } from "@/lib/companies";
+import { hrApi } from "@/lib/hr-api";
 import type {
   Department,
   Employee,
@@ -97,8 +98,8 @@ export function EmployeeInquiry() {
 
   const loadMeta = useCallback(async (company: CompanyFilter) => {
     const [deptRes, optRes] = await Promise.all([
-      fetch(`/api/departments?company=${company}`),
-      fetch(`/api/employees?meta=1&company=${company}`),
+      fetch(`${hrApi("/departments")}?company=${company}`),
+      fetch(`${hrApi("/employees")}?meta=1&company=${company}`),
     ]);
     const deptData = (await deptRes.json()) as {
       departments?: Department[];
@@ -116,7 +117,7 @@ export function EmployeeInquiry() {
     setIsLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/employees?${toQuery(nextFilters)}`);
+      const response = await fetch(`${hrApi("/employees")}?${toQuery(nextFilters)}`);
       const data = (await response.json()) as {
         employees?: Employee[];
         error?: string;

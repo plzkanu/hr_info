@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Employee, EmployeeFamilyMember } from "@/lib/types";
+import { hrApi } from "@/lib/hr-api";
 
 interface EmployeeFamilyPanelProps {
   employee: Employee;
@@ -26,7 +27,7 @@ export function EmployeeFamilyPanel({ employee }: EmployeeFamilyPanelProps) {
         const params = new URLSearchParams({ empNo: employee.empNo });
         if (employee.companyCode) params.set("company", employee.companyCode);
         const response = await fetch(
-          `/api/employees/family?${params.toString()}`,
+          `${hrApi("/employees/family")}?${params.toString()}`,
         );
         const data = (await response.json()) as {
           members?: EmployeeFamilyMember[];

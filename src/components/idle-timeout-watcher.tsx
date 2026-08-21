@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IdleTimeoutSettings } from "@/lib/app-settings-types";
+import { hrApi } from "@/lib/hr-api";
 
 const ACTIVITY_EVENTS: (keyof DocumentEventMap)[] = [
   "mousemove",
@@ -15,7 +16,7 @@ const ACTIVITY_EVENTS: (keyof DocumentEventMap)[] = [
 ];
 
 async function logout() {
-  await fetch("/api/auth/logout", { method: "POST", keepalive: true });
+  await fetch(hrApi("/auth/logout"), { method: "POST", keepalive: true });
 }
 
 export function IdleTimeoutWatcher() {
@@ -32,7 +33,7 @@ export function IdleTimeoutWatcher() {
 
   const loadSettings = useCallback(async () => {
     try {
-      const response = await fetch("/api/session/idle-timeout");
+      const response = await fetch(hrApi("/session/idle-timeout"));
       if (!response.ok) return;
       const data = (await response.json()) as {
         settings?: IdleTimeoutSettings;
@@ -73,7 +74,7 @@ export function IdleTimeoutWatcher() {
   const extendSession = useCallback(async () => {
     setIsExtending(true);
     try {
-      await fetch("/api/auth/extend", { method: "POST" });
+      await fetch(hrApi("/auth/extend"), { method: "POST" });
       lastActivityRef.current = Date.now();
       warningShownRef.current = false;
       graceDeadlineRef.current = null;

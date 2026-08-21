@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { PASSWORD_CHANGE_HINT } from "@/lib/password";
+import { hrApi } from "@/lib/hr-api";
 
 interface ForcePasswordChangeModalProps {
   userId: string;
@@ -43,7 +44,7 @@ export function ForcePasswordChangeModal({
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/auth/complete-password-change", {
+      const res = await fetch(hrApi("/auth/complete-password-change"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

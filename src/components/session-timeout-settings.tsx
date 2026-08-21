@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { IdleTimeoutSettings } from "@/lib/app-settings-types";
+import { hrApi } from "@/lib/hr-api";
 
 export function SessionTimeoutSettings() {
   const [settings, setSettings] = useState<IdleTimeoutSettings | null>(null);
@@ -16,7 +17,7 @@ export function SessionTimeoutSettings() {
     setIsLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/settings");
+      const response = await fetch(hrApi("/admin/settings"));
       const data = (await response.json()) as {
         settings?: IdleTimeoutSettings;
         error?: string;
@@ -56,7 +57,7 @@ export function SessionTimeoutSettings() {
         throw new Error("타임아웃은 최대 1440분(24시간)까지 지정할 수 있습니다.");
       }
 
-      const response = await fetch("/api/admin/settings", {
+      const response = await fetch(hrApi("/admin/settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idleTimeoutMinutes: enabled ? parsed : 0 }),

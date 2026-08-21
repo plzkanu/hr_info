@@ -12,6 +12,7 @@ import type {
   EmployeeLicense,
   EmployeeRewardPenalty,
 } from "@/lib/types";
+import { hrApi } from "@/lib/hr-api";
 
 function dash(value: string | number | null | undefined) {
   if (value == null || value === "") return "-";
@@ -31,7 +32,7 @@ function Badge({ show, label }: { show: boolean; label: string }) {
 export function EmployeeEducationPanel({ employee }: { employee: Employee }) {
   const { rows, isLoading, error } = useEmployeeRelatedRows<EmployeeEducation>(
     employee,
-    "/api/employees/education",
+    hrApi("/employees/education"),
     "학력 정보를 불러오지 못했습니다.",
   );
 
@@ -106,7 +107,7 @@ export function EmployeeEducationPanel({ employee }: { employee: Employee }) {
 export function EmployeeCareerPanel({ employee }: { employee: Employee }) {
   const { rows, isLoading, error } = useEmployeeRelatedRows<EmployeeCareer>(
     employee,
-    "/api/employees/career",
+    hrApi("/employees/career"),
     "경력 정보를 불러오지 못했습니다.",
   );
 
@@ -168,7 +169,7 @@ export function EmployeeCareerPanel({ employee }: { employee: Employee }) {
 export function EmployeeLicensesPanel({ employee }: { employee: Employee }) {
   const { rows, isLoading, error } = useEmployeeRelatedRows<EmployeeLicense>(
     employee,
-    "/api/employees/licenses",
+    hrApi("/employees/licenses"),
     "자격증 정보를 불러오지 못했습니다.",
   );
 
@@ -236,7 +237,7 @@ export function EmployeeLicensesPanel({ employee }: { employee: Employee }) {
 export function EmployeeLanguagesPanel({ employee }: { employee: Employee }) {
   const { rows, isLoading, error } = useEmployeeRelatedRows<EmployeeLanguage>(
     employee,
-    "/api/employees/languages",
+    hrApi("/employees/languages"),
     "어학 정보를 불러오지 못했습니다.",
   );
 
@@ -303,7 +304,7 @@ export function EmployeeRewardPenaltyPanel({
   const { rows, isLoading, error } =
     useEmployeeRelatedRows<EmployeeRewardPenalty>(
       employee,
-      "/api/employees/reward-penalty",
+      hrApi("/employees/reward-penalty"),
       "상벌 정보를 불러오지 못했습니다.",
     );
 

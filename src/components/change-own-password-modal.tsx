@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { PASSWORD_CHANGE_HINT } from "@/lib/password";
+import { hrApi } from "@/lib/hr-api";
 
 interface ChangeOwnPasswordModalProps {
   userName: string;
@@ -41,7 +42,7 @@ export function ChangeOwnPasswordModal({
 
     setIsSaving(true);
     try {
-      const res = await fetch("/api/auth/change-password", {
+      const res = await fetch(hrApi("/auth/change-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
