@@ -414,12 +414,34 @@ export function EmployeeInquiry() {
               : "조회 결과가 없습니다."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <div>
+            <table className="w-full table-fixed text-left text-[12px] leading-5">
+              <colgroup>
+                <col className="w-[36px]" />
+                <col className="w-[28px]" />
+                <col className="w-[44px]" />
+                <col className="w-[11%]" />
+                <col className="w-[7%]" />
+                <col className="w-[78px]" />
+                <col className="w-[78px]" />
+                <col className="w-[13%]" />
+                <col className="w-[7%]" />
+                <col className="w-[64px]" />
+                <col className="w-[8%]" />
+                <col className="w-[72px]" />
+                <col className="w-[88px]" />
+                <col className="w-[108px]" />
+                <col className="w-[36px]" />
+                <col className="w-[78px]" />
+                <col className="w-[40px]" />
+                <col className="w-[36px]" />
+              </colgroup>
+              <thead className="bg-slate-50 text-[11px] text-slate-500">
                 <tr>
-                  <th className="px-3 py-3 font-medium">No</th>
-                  <th className="px-2 py-3 font-medium">
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    No
+                  </th>
+                  <th className="whitespace-nowrap px-1 py-2 font-medium">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -427,29 +449,63 @@ export function EmployeeInquiry() {
                       aria-label="전체 선택"
                     />
                   </th>
-                  <th className="px-3 py-3 font-medium">회사</th>
-                  <th className="px-3 py-3 font-medium">부서</th>
-                  <th className="px-3 py-3 font-medium">사원</th>
-                  <th className="px-3 py-3 font-medium">입사일</th>
-                  <th className="px-3 py-3 font-medium">퇴사일</th>
-                  <th className="px-3 py-3 font-medium">이메일</th>
-                  <th className="px-3 py-3 font-medium">직책</th>
-                  <th className="px-3 py-3 font-medium">사번</th>
-                  <th className="px-3 py-3 font-medium">영문이름</th>
-                  <th className="px-3 py-3 font-medium">사원구분</th>
-                  <th className="px-3 py-3 font-medium">재직/퇴직구분</th>
-                  <th className="px-3 py-3 font-medium">주민등록번호</th>
-                  <th className="px-3 py-3 font-medium">성별</th>
-                  <th className="px-3 py-3 font-medium">생년월일</th>
-                  <th className="px-3 py-3 font-medium">양/음</th>
-                  <th className="px-3 py-3 font-medium">나이</th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    회사
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    부서
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    사원
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    입사일
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    퇴사일
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    이메일
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    직책
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    사번
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    영문이름
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    사원구분
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    재직/퇴직구분
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    주민등록번호
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    성별
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    생년월일
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    양/음
+                  </th>
+                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
+                    나이
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {employees.map((emp, index) => (
                   <tr key={emp.id} className="hover:bg-slate-50/80">
-                    <td className="px-3 py-3 text-slate-400">{index + 1}</td>
-                    <td className="px-2 py-3">
+                    <td className="whitespace-nowrap px-1.5 py-1.5 text-slate-400">
+                      {index + 1}
+                    </td>
+                    <td className="whitespace-nowrap px-1 py-1.5">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(emp.id)}
@@ -457,13 +513,11 @@ export function EmployeeInquiry() {
                         aria-label={`${emp.name} 선택`}
                       />
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {emp.companyCode}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="truncate px-1.5 py-1.5">{emp.companyCode}</td>
+                    <td className="truncate px-1.5 py-1.5" title={emp.departmentName}>
                       {emp.departmentName}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="truncate px-1.5 py-1.5">
                       <button
                         type="button"
                         onClick={() => setDetail(emp)}
@@ -472,26 +526,22 @@ export function EmployeeInquiry() {
                         {emp.name}
                       </button>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {emp.hireDate}
+                    <td className="truncate px-1.5 py-1.5">{emp.hireDate}</td>
+                    <td className="truncate px-1.5 py-1.5">{emp.resignDate}</td>
+                    <td className="truncate px-1.5 py-1.5" title={emp.email}>
+                      {emp.email}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {emp.resignDate}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap">{emp.email}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="truncate px-1.5 py-1.5" title={emp.position}>
                       {emp.position}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">{emp.empNo}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="truncate px-1.5 py-1.5">{emp.empNo}</td>
+                    <td className="truncate px-1.5 py-1.5" title={emp.englishName}>
                       {emp.englishName}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {emp.empCategory}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="truncate px-1.5 py-1.5">{emp.empCategory}</td>
+                    <td className="truncate px-1.5 py-1.5">
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        className={`rounded-full px-1.5 py-px text-[10px] font-medium ${
                           emp.employmentStatus === "재직자"
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-slate-100 text-slate-600"
@@ -500,17 +550,13 @@ export function EmployeeInquiry() {
                         {emp.employmentStatus}
                       </span>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap font-mono text-xs">
+                    <td className="truncate px-1.5 py-1.5 font-mono text-[11px]">
                       {emp.residentId}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">{emp.gender}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {emp.birthDate}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {emp.calendarType}
-                    </td>
-                    <td className="px-3 py-3">{emp.age ?? ""}</td>
+                    <td className="truncate px-1.5 py-1.5">{emp.gender}</td>
+                    <td className="truncate px-1.5 py-1.5">{emp.birthDate}</td>
+                    <td className="truncate px-1.5 py-1.5">{emp.calendarType}</td>
+                    <td className="truncate px-1.5 py-1.5">{emp.age ?? ""}</td>
                   </tr>
                 ))}
               </tbody>

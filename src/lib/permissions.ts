@@ -2,7 +2,7 @@ export const FEATURE_PERMISSIONS = [
   {
     id: "view_full_resident_id",
     label: "주민번호 전체보기",
-    description: "사원명부와 엑셀에서 주민등록번호 전체를 볼 수 있습니다.",
+    description: "사원명부와 엑셀에서 주민등록번호 13자리를 모두 볼 수 있습니다.",
   },
 ] as const;
 

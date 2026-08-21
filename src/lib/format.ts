@@ -71,14 +71,10 @@ export function calcAge(
   return age < 0 ? null : age;
 }
 
-/** 주민등록번호 마스킹: 앞 7자리만 표시 */
+/** 주민등록번호 마스킹: 13자리 전부 숨김 */
 export function maskResidentId(value: string): string {
-  const digits = value.replace(/[^0-9]/g, "");
-  if (digits.length < 7) {
-    if (!value) return "";
-    return value.slice(0, 8) + "******";
-  }
-  return `${digits.slice(0, 6)}-${digits.slice(6, 7)}******`;
+  if (!(value ?? "").trim()) return "";
+  return "******-*******";
 }
 
 export function formatResidentId(value: string, revealFull: boolean): string {
