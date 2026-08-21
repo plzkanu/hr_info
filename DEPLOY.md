@@ -59,53 +59,57 @@ git push -u origin main
 
 ## 3. Replit 배포
 
-1. Replit 프로젝트가 GitHub `plzkanu/hr_info`의 `main`을 보도록 연결합니다.
-2. 왼쪽 **Secrets**에 위 환경 변수를 넣습니다. (Shell에서 키를 붙여 넣지 않습니다.)
-3. 아래 명령을 **Replit Shell**에서 실행합니다.
+1. 왼쪽 **Secrets**에 위 환경 변수를 넣습니다. (Shell에서 키를 붙여 넣지 않습니다.)
+2. 아래 명령을 **Replit Shell**에서 실행합니다.
 
-### 처음 한 번 (또는 코드가 없을 때)
+### `origin`이 없다는 에러가 날 때
 
-프로젝트 폴더에서 GitHub를 연결하고 `main`을 받습니다.
+`fatal: 'origin' does not appear to be a git repository` 는 GitHub 연결이 없다는 뜻입니다. 아래를 **한 번** 실행합니다.
 
 ```bash
 git remote -v
 git remote add origin https://github.com/plzkanu/hr_info.git
-git fetch origin
-git checkout -B main origin/main
 ```
 
-이미 `origin`이 있으면 `git remote add`는 건너뜁니다.
+이미 `origin`이 있는데 주소가 다르면 `add` 대신:
 
 ```bash
 git remote set-url origin https://github.com/plzkanu/hr_info.git
-git fetch origin
-git checkout main
-git pull origin main
 ```
 
-### 매번 배포할 때 (Replit Shell)
-
-Secrets를 저장한 뒤, Shell에서 아래를 **위에서 아래로** 실행합니다.
+git 저장소 자체가 아니면:
 
 ```bash
-cd ~/hr_info || cd .
-
-git status
-git fetch origin
-git checkout main
-git pull origin main
-
-npm install
-npm run build
+git init
+git remote add origin https://github.com/plzkanu/hr_info.git
 ```
 
-빌드가 끝나면 운영 서버를 켭니다. Replit이 열어 주는 포트에 맞춥니다.
+연결한 뒤 코드 받기 + 빌드:
 
 ```bash
-npm run start -- -H 0.0.0.0 -p ${PORT:-3000}
+git fetch origin main && git reset --hard origin/main && npm install && npm run build
 ```
 
-이 명령은 서버가 떠 있는 동안 Shell을 점유합니다. 중지하려면 해당 Shell에서 `Ctrl + C`를 누릅니다.
+빌드가 끝나면:
+
+```bash
+npm run start:prod
+```
+
+### 매번 배포할 때 (origin이 이미 있을 때)
+
+```bash
+git fetch origin main && git reset --hard origin/main && npm install && npm run build
+npm run start:prod
+```
+
+`reset --hard`는 Replit에만 있는 로컬 수정이 지워집니다. GitHub `main`과 똑같이 맞출 때 씁니다.
+
+이 `start` 명령은 서버가 떠 있는 동안 Shell을 점유합니다. 중지하려면 `Ctrl + C`입니다. 이전에 서버가 켜져 있으면 먼저 끄고 다시 실행합니다. 포트가 남아 있으면:
+
+```bash
+fuser -k ${PORT:-3000}/tcp || true
+```
 
 환경 변수가 들어갔는지만 확인할 때는 값을 출력하지 말고 아래를 씁니다.
 
@@ -115,26 +119,7 @@ test -n "$NEXT_PUBLIC_SUPABASE_URL" && echo "NEXT_PUBLIC_SUPABASE_URL=ok" || ech
 test -n "$SUPABASE_SERVICE_ROLE_KEY" && echo "SUPABASE_SERVICE_ROLE_KEY=ok" || echo "SUPABASE_SERVICE_ROLE_KEY=missing"
 ```
 
-### 코드만 다시 받아 재배포
-
-로컬에서 `git push origin main` 한 뒤, Replit Shell에서:
-
-```bash
-git fetch origin
-git checkout main
-git pull origin main
-npm install
-npm run build
-npm run start -- -H 0.0.0.0 -p ${PORT:-3000}
-```
-
-이전에 `npm run start`가 켜져 있으면 먼저 그 Shell에서 `Ctrl + C`로 끄고 다시 실행합니다. 포트가 남아 있으면:
-
-```bash
-fuser -k ${PORT:-3000}/tcp || true
-```
-
-개발 확인만 할 때는 `npm run dev -- -H 0.0.0.0 -p ${PORT:-3000}` 을 써도 됩니다. 운영은 `build` 후 `start`를 권장합니다.
+개발 확인만 할 때는 `npm run dev -- -H 0.0.0.0 -p ${PORT:-3000}` 을 써도 됩니다. Replit 퍼블리시는 `build` 후 `start:prod`를 권장합니다.
 
 ### `/api` 경로 주의
 
@@ -143,6 +128,31 @@ Replit에서 다른 앱이 `/api`를 가로채면 로그인이 404가 납니다.
 예: 로그인은 `POST /hr-api/auth/login`
 
 Replit 프록시에서 `/hr-api`가 다른 API 서버가 아니라 **이 Next.js 앱**으로 가게 해야 합니다. `/api`는 기존 앱이 써도 됩니다.
+
+### 퍼블리시 헬스체크
+
+Replit Publish가 `healthcheck /internal-api` 또는 `healthcheck /` 에서 500·connection refused를 내면, 예전 `api-server`(포트 1104)를 보고 있는 겁니다. 이 앱은 Next.js이며 `artifacts/api-server`가 아닙니다.
+
+1. GitHub 최신 `main`을 받은 뒤 `npm run build`까지 다시 합니다.
+2. 실행은 **반드시** Next.js 운영 스크립트입니다. 예전 `api-server`가 아닙니다.
+
+```bash
+npm run start:prod
+```
+
+이 스크립트는 Next.js를 `$PORT`에 띄우고, Replit 헬스체크용으로 `127.0.0.1:1104`에서 `/internal-api`에 200을 줍니다.
+
+3. Replit **Publish / Deployment** 설정에서
+   - Run command: `npm run start:prod`
+   - Health check path: `/internal-api`
+   - 포트 충돌이 나면 예전 api-server 프로세스를 먼저 종료합니다.
+4. Replit Secrets의 `SUPABASE_SSL_VERIFY`는 **빼는 것**을 권장합니다. 공개 Replit에서는 필요 없고, 로그에 `NODE_TLS_REJECT_UNAUTHORIZED` 경고가 납니다.
+
+헬스체크가 통과하는 주소:
+
+- `GET /` → 로그인 화면 (200)
+- `GET /internal-api` → `{ "ok": true }`
+- `GET /hr-api/health` → `{ "ok": true }`
 
 ## 4. 배포 후 확인
 
@@ -171,12 +181,11 @@ git push origin main
 Replit Shell에서:
 
 ```bash
-git fetch origin
-git checkout main
-git pull origin main
-npm install
-npm run build
-npm run start -- -H 0.0.0.0 -p ${PORT:-3000}
+git remote add origin https://github.com/plzkanu/hr_info.git
+git fetch origin main && git reset --hard origin/main && npm install && npm run build
+npm run start:prod
 ```
+
+`origin`이 이미 있으면 `git remote add` 줄은 건너뛰거나, 주소만 고칠 때 `git remote set-url origin https://github.com/plzkanu/hr_info.git` 을 씁니다.
 
 스키마를 바꿨으면 Supabase에서 `apply-all-migrations.sql`도 다시 실행합니다.

@@ -11,7 +11,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-noto-sans-kr), "Malgun Gothic", sans-serif;
+  --font-sans: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
   --max-width-app: 104.54rem;
   --max-width-detail-modal: 61rem;
 }

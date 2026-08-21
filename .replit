@@ -1,0 +1,10 @@
+run = "npm run start:prod"
+
+[deployment]
+deploymentTarget = "autoscale"
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start:prod"]
+
+[env]
+NODE_ENV = "production"
+HOST = "0.0.0.0"
