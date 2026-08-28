@@ -149,15 +149,15 @@ node scripts/start-prod.mjs
 - build: `node scripts/build-prod.mjs`
 - run: `node scripts/start-prod.mjs`
 
-이 스크립트는 Next.js를 `$PORT`에 띄우고, Replit 헬스체크용으로 `127.0.0.1:1104`에서 `/internal-api`에 200을 줍니다.
+이 스크립트는 Next.js를 `$PORT`에 띄우고, Replit 헬스체크용으로 `127.0.0.1:1104`에서 `/`와 `/internal-api`에 200을 줍니다. 사이드카는 Promote/Autoscale에서도 항상 먼저 기동합니다.
 
 3. Replit **Publish / Deployment** 설정에서
    - Build command: `node scripts/build-prod.mjs` (`npm run build` 아님)
    - Run command: `node scripts/start-prod.mjs` (`npm run start:prod` 아님)
-   - Health check path: `/internal-api`
+   - Health check path: `/internal-api` 또는 `/`
 
 `.replit`의 `[env]`에 `NODE_ENV=production`을 넣지 않습니다. 넣으면 패키지 설치 때 Tailwind 등 빌드 의존성이 빠져 `@tailwindcss/postcss`를 못 찾습니다. `NODE_ENV=production`은 `start-prod.mjs`가 Next.js를 켤 때만 적용합니다.
-4. Replit Secrets의 `SUPABASE_SSL_VERIFY`는 **빼는 것**을 권장합니다. 공개 Replit에서는 필요 없고, 로그에 `NODE_TLS_REJECT_UNAUTHORIZED` 경고가 납니다.
+4. Replit Secrets에서 `SUPABASE_SSL_VERIFY`와 `NODE_TLS_REJECT_UNAUTHORIZED`는 **삭제**하세요. 공개 Replit에서는 필요 없고, 기동 로그에 TLS 경고가 나며 Promote 실패와 섞여 보입니다.
 
 헬스체크가 통과하는 주소:
 
