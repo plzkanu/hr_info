@@ -157,7 +157,7 @@ node scripts/start-prod.mjs
    - Health check path: `/internal-api` 또는 `/`
 
 `.replit`의 `[env]`에 `NODE_ENV=production`을 넣지 않습니다. 넣으면 패키지 설치 때 Tailwind 등 빌드 의존성이 빠져 `@tailwindcss/postcss`를 못 찾습니다. `NODE_ENV=production`은 `start-prod.mjs`가 Next.js를 켤 때만 적용합니다.
-4. Replit Secrets에서 `SUPABASE_SSL_VERIFY`와 `NODE_TLS_REJECT_UNAUTHORIZED`는 **삭제**하세요. 공개 Replit에서는 필요 없고, 기동 로그에 TLS 경고가 나며 Promote 실패와 섞여 보입니다.
+4. Replit Secrets에 넣을 값은 `AUTH_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 입니다. `SUPABASE_SSL_VERIFY`나 `NODE_TLS_REJECT_UNAUTHORIZED`는 **없어도 됩니다.** 로그에 TLS 경고가 보여도 Secrets에 그 키가 없으면 무시해도 됩니다.
 
 헬스체크가 통과하는 주소:
 
