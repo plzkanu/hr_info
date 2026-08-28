@@ -1,4 +1,5 @@
-import { Agent, fetch as undiciFetch } from "undici";
+import http from "node:http";
+import https from "node:https";
 import { isSupabaseTlsInsecure } from "./config";
 
 /** PostgREST 기본 max-rows(1000)를 넘기려면 range 페이징이 필요합니다. */
@@ -67,29 +68,87 @@ export function formatSupabaseNetworkError(message: string): string {
   return message;
 }
 
+const SKIP_HEADERS = new Set([
+  "host",
+  "content-length",
+  "connection",
+  "transfer-encoding",
+]);
+
+let insecureAgent: https.Agent | null = null;
 let insecureFetch: typeof globalThis.fetch | null = null;
+
+function headerRecord(headers: Headers): Record<string, string> {
+  const record: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    if (!SKIP_HEADERS.has(key.toLowerCase())) {
+      record[key] = value;
+    }
+  });
+  return record;
+}
+
+function nodeInsecureFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const request = input instanceof Request ? input : new Request(input, init);
+  const url = new URL(request.url);
+  const client = url.protocol === "http:" ? http : https;
+  if (!insecureAgent) {
+    insecureAgent = new https.Agent({ rejectUnauthorized: false });
+  }
+
+  return new Promise((resolve, reject) => {
+    const req = client.request(
+      url,
+      {
+        method: request.method,
+        headers: headerRecord(request.headers),
+        agent: url.protocol === "https:" ? insecureAgent! : undefined,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const headers = new Headers();
+          for (const [key, value] of Object.entries(res.headers)) {
+            if (value == null) continue;
+            headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+          }
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: res.statusCode ?? 500,
+              statusText: res.statusMessage,
+              headers,
+            }),
+          );
+        });
+      },
+    );
+    req.on("error", reject);
+    void request
+      .arrayBuffer()
+      .then((buffer) => {
+        if (buffer.byteLength > 0) {
+          req.write(Buffer.from(buffer));
+        }
+        req.end();
+      })
+      .catch(reject);
+  });
+}
 
 /**
  * SUPABASE_SSL_VERIFY=0 일 때 인증서 검증만 생략합니다.
- * NODE_TLS_REJECT_UNAUTHORIZED 를 바꾸면 Next.js가 경고를 페이지 에러로 띄웁니다.
+ * npm undici는 Replit Node에서 markAsUncloneable 오류를 냅니다.
  */
 export function getSupabaseFetch(): typeof globalThis.fetch {
   if (!isSupabaseTlsInsecure()) {
     return globalThis.fetch.bind(globalThis);
   }
-  if (insecureFetch) {
-    return insecureFetch;
+  if (!insecureFetch) {
+    insecureFetch = nodeInsecureFetch as typeof globalThis.fetch;
   }
-
-  const dispatcher = new Agent({
-    connect: { rejectUnauthorized: false },
-  });
-
-  insecureFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-    undiciFetch(input as Parameters<typeof undiciFetch>[0], {
-      ...(init as object),
-      dispatcher,
-    })) as unknown as typeof globalThis.fetch;
-
   return insecureFetch;
 }
