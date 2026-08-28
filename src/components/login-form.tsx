@@ -17,10 +17,10 @@ export function LoginForm() {
     userId: string;
     currentPassword: string;
   } | null>(null);
-  const idleLogout = searchParams.get("reason") === "idle";
+  const idleLogout = searchParams?.get("reason") === "idle";
 
   function goDashboard() {
-    const from = searchParams.get("from");
+    const from = searchParams?.get("from");
     router.push(from && from.startsWith("/dashboard") ? from : "/dashboard");
     router.refresh();
   }
