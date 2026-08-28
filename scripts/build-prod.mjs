@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { nextCli, npmCommand } from "./node-paths.mjs";
+import { fileURLToPath } from "node:url";
+import { npmCommand } from "./node-paths.mjs";
 
 function run(command, args, env = process.env) {
   const result = spawnSync(command, args, {
@@ -53,4 +54,4 @@ function ensureDependencies() {
 }
 
 ensureDependencies();
-run(process.execPath, [nextCli(), "build"]);
+run(process.execPath, [fileURLToPath(new URL("./next-build.mjs", import.meta.url))]);

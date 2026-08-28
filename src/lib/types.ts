@@ -98,6 +98,23 @@ export interface Employee {
   tenure: string;
   excludeFromHeadcount: boolean;
   age: number | null;
+  chineseName: string;
+  jobTitle: string;
+  jobRank: string;
+  jobTypeName: string;
+  payStep: string;
+  religion: string;
+  hobby: string;
+  specialty: string;
+  nationalityName: string;
+  marriageStatus: string;
+  disabledLabel: string;
+  address: string;
+  addressZip: string;
+  lastSchoolName: string;
+  lastEducationName: string;
+  lastMajorName: string;
+  lastMajorFieldName: string;
 }
 
 export interface EmployeeFilters {
@@ -122,6 +139,7 @@ export interface EmployeeFilters {
 }
 
 export interface EmployeeFilterOptions {
+  companies: string[];
   empCategories: string[];
   employTypes: string[];
   nationalityTypes: string[];
@@ -141,6 +159,7 @@ export interface EmployeeAppointment {
   orderDepartmentName: string;
   positionName: string;
   jobGradeName: string;
+  jobRankName: string;
   jobDutyName: string;
   jobTypeName: string;
   jobName: string;
@@ -180,6 +199,8 @@ export interface EmployeeEducation {
   careerName: string;
   schoolName: string;
   majorName: string;
+  majorFieldName: string;
+  majorCourseName: string;
   minorName: string;
   dayNightName: string;
   enterYearMonth: string | null;
@@ -240,4 +261,25 @@ export interface EmployeeLicense {
   allowPay: boolean;
   statutory: boolean;
   remark: string;
+}
+
+export interface EmployeeMilitary {
+  key: string;
+  serviceName: string;
+  kindName: string;
+  branchName: string;
+  specialtyName: string;
+  enrollDate: string | null;
+  dischargeDate: string | null;
+}
+
+export interface EmployeeHrCard {
+  employee: Employee;
+  appointments: EmployeeAppointment[];
+  family: EmployeeFamilyMember[];
+  education: EmployeeEducation[];
+  career: EmployeeCareer[];
+  licenses: EmployeeLicense[];
+  rewards: EmployeeRewardPenalty[];
+  military: EmployeeMilitary[];
 }

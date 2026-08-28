@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ChangeOwnPasswordModal } from "@/components/change-own-password-modal";
 import { LogoutButton } from "@/components/logout-button";
+import { deployedAtLabel } from "@/lib/build-info";
 import { mainNavItems } from "@/lib/nav";
 import type { SessionUser } from "@/lib/types";
 
@@ -35,6 +36,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
     (item) => !item.adminOnly || user.role === "admin",
   );
   const initial = user.name.trim().charAt(0) || user.id.charAt(0);
+  const deployedAt = deployedAtLabel();
 
   return (
     <aside className="app-sidebar fixed top-0 left-0 z-[100] flex h-screen w-[220px] flex-col bg-[#0F2645]">
@@ -111,6 +113,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
         <div className="mt-3">
           <LogoutButton className="w-full rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-60" />
         </div>
+        <p className="mt-3 text-[10px] leading-4 text-white/35">
+          배포
+          <br />
+          {deployedAt || "로컬 실행"}
+        </p>
       </div>
 
       {showPasswordModal ? (

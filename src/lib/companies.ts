@@ -1,40 +1,49 @@
+/** UI 기본값. 실제 목록은 soosan_companies를 우선합니다. */
 export const COMPANY_CODES = ["ENS", "IND"] as const;
 
-export type CompanyCode = (typeof COMPANY_CODES)[number];
+export type CompanyCode = string;
+export type CompanyFilter = string;
 
-/** 빈 문자열은 조회조건의 "전체" */
-export type CompanyFilter = "" | CompanyCode;
+export interface CompanyRecord {
+  id: number;
+  code: string;
+  name: string;
+}
 
-export const COMPANY_ROSTER_TABLE: Record<CompanyCode, string> = {
+export function rosterTableFor(code: string): string {
+  return `${code.trim().toLowerCase()}_emp_roster`;
+}
+
+export const COMPANY_ROSTER_TABLE: Record<string, string> = {
   ENS: "ens_emp_roster",
   IND: "ind_emp_roster",
 };
 
-export const COMPANY_SEQ: Partial<Record<CompanyCode, number>> = {
-  ENS: 1,
-};
+function normalizeCode(value: string | null | undefined): string {
+  return (value ?? "").trim().toUpperCase();
+}
 
 export function parseCompanyFilter(
   value: string | null | undefined,
 ): CompanyFilter {
-  if (value === "ENS" || value === "IND") {
-    return value;
-  }
-  return "";
-}
-
-export function companiesForFilter(filter: CompanyFilter): CompanyCode[] {
-  return filter ? [filter] : [...COMPANY_CODES];
+  return normalizeCode(value);
 }
 
 export function isMissingRosterTable(message: string): boolean {
   const normalized = message.toLowerCase();
+  if (normalized.includes("column")) {
+    return false;
+  }
   return (
     normalized.includes("could not find the table") ||
-    normalized.includes("schema cache") ||
+    (normalized.includes("schema cache") &&
+      (normalized.includes("ind_emp_roster") ||
+        normalized.includes("ens_emp_roster") ||
+        normalized.includes("soosan_companies"))) ||
     (normalized.includes("does not exist") &&
       (normalized.includes("ind_emp_roster") ||
         normalized.includes("ens_emp_roster") ||
+        normalized.includes("soosan_companies") ||
         normalized.includes("relation")))
   );
 }

@@ -1,7 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
-import { COMPANY_SEQ, parseCompanyFilter } from "./companies";
+import { getCompanyId } from "./companies-server";
 import { formatDate } from "./format";
 import type { EmployeeAppointment } from "./types";
 
@@ -21,6 +21,7 @@ interface AppointmentRow {
   pos_name: string | null;
   um_jp_name: string | null;
   um_jd_name: string | null;
+  um_ps_name: string | null;
   um_jo_name: string | null;
   job_name: string | null;
   um_pg_name: string | null;
@@ -50,6 +51,7 @@ function mapAppointment(row: AppointmentRow): EmployeeAppointment {
     orderDepartmentName: row.ord_dept_name || row.dept_name || "",
     positionName: row.pos_name ?? "",
     jobGradeName: row.um_jp_name ?? "",
+    jobRankName: row.um_ps_name ?? "",
     jobDutyName: row.um_jd_name ?? "",
     jobTypeName: row.um_jo_name ?? "",
     jobName: row.job_name ?? "",
@@ -79,17 +81,16 @@ export async function getEmployeeAppointments(
   let query = supabase
     .from("employee_appointments")
     .select(
-      "company_seq, emp_seq, sm_source_type, int_seq, emp_id, emp_name, sm_source_type_name, ord_name, ord_date, ord_end_date, dept_name, ord_dept_name, pos_name, um_jp_name, um_jd_name, um_jo_name, job_name, um_pg_name, um_ws_name, contents, remark, is_last, is_wk_ord",
+      "company_seq, emp_seq, sm_source_type, int_seq, emp_id, emp_name, sm_source_type_name, ord_name, ord_date, ord_end_date, dept_name, ord_dept_name, pos_name, um_jp_name, um_jd_name, um_ps_name, um_jo_name, job_name, um_pg_name, um_ws_name, contents, remark, is_last, is_wk_ord",
     )
     .eq("emp_id", normalizedEmpNo)
     .order("ord_date", { ascending: false })
     .order("int_seq", { ascending: false })
     .limit(500);
 
-  const companyFilter = parseCompanyFilter(company);
-  const companySeq = companyFilter ? COMPANY_SEQ[companyFilter] : undefined;
-  if (companySeq != null) {
-    query = query.eq("company_seq", companySeq);
+  const companyId = await getCompanyId(company);
+  if (companyId != null) {
+    query = query.eq("company_id", companyId);
   }
 
   const { data, error } = await query;

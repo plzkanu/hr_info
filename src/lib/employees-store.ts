@@ -1,22 +1,28 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
+import { fetchAllRows, formatSupabaseNetworkError } from "@/lib/supabase/fetch";
 import { collectSubDepartmentNames, getAllDepartments } from "./departments";
 import {
+  applicableLabel,
   calcAge,
   employmentStatusAsOf,
+  firstNonEmpty,
   formatDate,
   isTruthyFlag,
+  marriageLabel,
   nationalityLabel,
+  todayIsoDate,
 } from "./format";
 import {
+  COMPANY_CODES,
   COMPANY_ROSTER_TABLE,
-  companiesForFilter,
   isMissingRosterTable,
   parseCompanyFilter,
+  rosterTableFor,
   type CompanyCode,
   type CompanyFilter,
 } from "./companies";
+import { companiesForFilter, getCompanies } from "./companies-server";
 import type {
   Employee,
   EmployeeFilterOptions,
@@ -32,8 +38,10 @@ export interface RosterRow {
   company_name: string | null;
   pos_name: string | null;
   um_jp_name: string | null;
+  um_jd_name: string | null;
   um_pg_name: string | null;
   um_ps_name: string | null;
+  um_jo_name: string | null;
   job_name: string | null;
   um_emp_type_name: string | null;
   um_employ_type_name: string | null;
@@ -56,6 +64,19 @@ export interface RosterRow {
   remark: string | null;
   photo: string | null;
   wk_yymmdd: string | null;
+  people_name: string | null;
+  ps: string | number | null;
+  um_nation_name: string | null;
+  is_marriage: string | null;
+  is_disabled: string | null;
+  um_religion_name: string | null;
+  hobby: string | null;
+  speciality: string | null;
+  curr_addr: string | null;
+  curr_addr_zip: string | null;
+  um_sch_name: string | null;
+  um_sch_career_name: string | null;
+  um_major_course_name: string | null;
 }
 
 const ROSTER_SELECT = [
@@ -67,8 +88,10 @@ const ROSTER_SELECT = [
   "company_name",
   "pos_name",
   "um_jp_name",
+  "um_jd_name",
   "um_pg_name",
   "um_ps_name",
+  "um_jo_name",
   "job_name",
   "um_emp_type_name",
   "um_employ_type_name",
@@ -91,6 +114,19 @@ const ROSTER_SELECT = [
   "remark",
   "photo",
   "wk_yymmdd",
+  "people_name",
+  "ps",
+  "um_nation_name",
+  "is_marriage",
+  "is_disabled",
+  "um_religion_name",
+  "hobby",
+  "speciality",
+  "curr_addr",
+  "curr_addr_zip",
+  "um_sch_name",
+  "um_sch_career_name",
+  "um_major_course_name",
 ].join(", ");
 
 function requireSupabase() {
@@ -120,8 +156,8 @@ function mapEmployee(
     departmentFullName: row.dept_full_name ?? "",
     companyCode: company,
     companyName: (row.company_name ?? "").trim() || company,
-    position: (row.job_name || row.um_ps_name || row.um_jp_name || "").trim(),
-    jobGrade: row.um_jp_name ?? "",
+    position: (row.um_jd_name ?? "").trim(),
+    jobGrade: (row.um_jp_name ?? "").trim(),
     empCategory: row.um_emp_type_name ?? "",
     employType: row.um_employ_type_name ?? "",
     nationalityType: nationalityLabel(row.is_foreigner),
@@ -141,6 +177,23 @@ function mapEmployee(
     tenure: row.wk_yymmdd ?? "",
     excludeFromHeadcount: isTruthyFlag(row.is_ex_prb),
     age: calcAge(birthDate, asOfDate) ?? row.age ?? row.age2 ?? null,
+    chineseName: (row.people_name ?? "").trim(),
+    jobTitle: firstNonEmpty(row.pos_name, row.um_jp_name),
+    jobRank: (row.um_ps_name ?? "").trim(),
+    jobTypeName: (row.um_jo_name ?? "").trim(),
+    payStep: row.ps == null ? "" : String(row.ps).trim(),
+    religion: (row.um_religion_name ?? "").trim(),
+    hobby: (row.hobby ?? "").trim(),
+    specialty: (row.speciality ?? "").trim(),
+    nationalityName: (row.um_nation_name ?? "").trim(),
+    marriageStatus: marriageLabel(row.is_marriage),
+    disabledLabel: applicableLabel(row.is_disabled),
+    address: (row.curr_addr ?? "").trim(),
+    addressZip: (row.curr_addr_zip ?? "").trim(),
+    lastSchoolName: (row.um_sch_name ?? "").trim(),
+    lastEducationName: (row.um_sch_career_name ?? "").trim(),
+    lastMajorName: (row.um_major_course_name ?? "").trim(),
+    lastMajorFieldName: "",
   };
 }
 
@@ -149,72 +202,78 @@ async function searchOneCompany(
   company: CompanyCode,
 ): Promise<{ employees: Employee[]; rosterUnavailable: boolean }> {
   const supabase = createServerClient();
-  const table = COMPANY_ROSTER_TABLE[company];
+  const table = COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company);
   const asOfDate = filters.asOfDate || new Date().toISOString().slice(0, 10);
 
-  let query = supabase
-    .from(table)
-    .select(ROSTER_SELECT)
-    .order("dept_full_name", { ascending: true })
-    .order("emp_id", { ascending: true })
-    .limit(10000);
-
-  if (filters.empCategory) {
-    query = query.eq("um_emp_type_name", filters.empCategory);
-  }
-  if (filters.employType) {
-    query = query.eq("um_employ_type_name", filters.employType);
-  }
-  if (filters.empNo) {
-    query = query.ilike("emp_id", `%${filters.empNo}%`);
-  }
-  if (filters.empName) {
-    query = query.ilike("emp_name", `%${filters.empName}%`);
-  }
-  if (filters.hireDateFrom) {
-    query = query.gte("ent_date", filters.hireDateFrom);
-  }
-  if (filters.hireDateTo) {
-    query = query.lte("ent_date", filters.hireDateTo);
-  }
-  if (filters.resignDateFrom) {
-    query = query.gte("retire_date", filters.resignDateFrom);
-  }
-  if (filters.resignDateTo) {
-    query = query.lte("retire_date", filters.resignDateTo);
-  }
-  if (filters.nationalityType === "외국인") {
-    query = query.eq("is_foreigner", "1");
-  } else if (filters.nationalityType === "내국인") {
-    query = query.eq("is_foreigner", "0");
-  }
-  if (filters.payrollGroup) {
-    query = query.eq("um_pg_name", filters.payrollGroup);
-  }
-  if (filters.englishName) {
-    query = query.ilike("emp_eng_name", `%${filters.englishName}%`);
-  }
-  if (filters.remarks) {
-    query = query.ilike("remark", `%${filters.remarks}%`);
-  }
-  if (!filters.includeExcluded) {
-    query = query.neq("is_ex_prb", "1");
+  let subDepartmentNames: string[] | undefined;
+  if (filters.departmentName && filters.includeSubDepartments) {
+    const departments = await getAllDepartments(company);
+    subDepartmentNames = collectSubDepartmentNames(
+      departments,
+      filters.departmentName,
+    );
   }
 
-  if (filters.departmentName) {
-    if (filters.includeSubDepartments) {
-      const departments = await getAllDepartments(company);
-      const names = collectSubDepartmentNames(
-        departments,
-        filters.departmentName,
-      );
-      query = query.in("dept_name", names);
-    } else {
-      query = query.eq("dept_name", filters.departmentName);
+  const { data, error } = await fetchAllRows<RosterRow>((from, to) => {
+    let query = supabase
+      .from(table)
+      .select(ROSTER_SELECT)
+      .order("dept_full_name", { ascending: true })
+      .order("emp_id", { ascending: true })
+      .range(from, to);
+
+    if (filters.empCategory) {
+      query = query.eq("um_emp_type_name", filters.empCategory);
     }
-  }
+    if (filters.employType) {
+      query = query.eq("um_employ_type_name", filters.employType);
+    }
+    if (filters.empNo) {
+      query = query.ilike("emp_id", `%${filters.empNo}%`);
+    }
+    if (filters.empName) {
+      query = query.ilike("emp_name", `%${filters.empName}%`);
+    }
+    if (filters.hireDateFrom) {
+      query = query.gte("ent_date", filters.hireDateFrom);
+    }
+    if (filters.hireDateTo) {
+      query = query.lte("ent_date", filters.hireDateTo);
+    }
+    if (filters.resignDateFrom) {
+      query = query.gte("retire_date", filters.resignDateFrom);
+    }
+    if (filters.resignDateTo) {
+      query = query.lte("retire_date", filters.resignDateTo);
+    }
+    if (filters.nationalityType === "외국인") {
+      query = query.eq("is_foreigner", "1");
+    } else if (filters.nationalityType === "내국인") {
+      query = query.eq("is_foreigner", "0");
+    }
+    if (filters.payrollGroup) {
+      query = query.eq("um_pg_name", filters.payrollGroup);
+    }
+    if (filters.englishName) {
+      query = query.ilike("emp_eng_name", `%${filters.englishName}%`);
+    }
+    if (filters.remarks) {
+      query = query.ilike("remark", `%${filters.remarks}%`);
+    }
+    if (!filters.includeExcluded) {
+      query = query.neq("is_ex_prb", "1");
+    }
 
-  const { data, error } = await query;
+    if (filters.departmentName) {
+      if (subDepartmentNames) {
+        query = query.in("dept_name", subDepartmentNames);
+      } else {
+        query = query.eq("dept_name", filters.departmentName);
+      }
+    }
+
+    return query;
+  });
   if (error) {
     if (isMissingRosterTable(error.message)) {
       return { employees: [], rosterUnavailable: true };
@@ -241,7 +300,7 @@ export async function searchEmployees(
   filters: EmployeeFilters,
 ): Promise<{ employees: Employee[]; rosterUnavailable: boolean }> {
   requireSupabase();
-  const companies = companiesForFilter(parseCompanyFilter(filters.company));
+  const companies = await companiesForFilter(parseCompanyFilter(filters.company));
   const results = await Promise.all(
     companies.map((company) => searchOneCompany(filters, company)),
   );
@@ -268,6 +327,7 @@ export async function searchEmployees(
 }
 
 const emptyFilterOptions = (): EmployeeFilterOptions => ({
+  companies: [...COMPANY_CODES],
   empCategories: [],
   employTypes: [],
   nationalityTypes: ["내국인", "외국인"],
@@ -285,12 +345,22 @@ async function getFilterOptionsFromTable(
   company: CompanyCode,
 ): Promise<EmployeeFilterOptions> {
   const supabase = createServerClient();
-  const { data, error } = await supabase
-    .from(COMPANY_ROSTER_TABLE[company])
-    .select(
-      "um_emp_type_name, um_employ_type_name, ent_ret_name, ent_ret_type_name, um_pg_name, is_foreigner",
-    )
-    .limit(10000);
+  const { data, error } = await fetchAllRows<{
+    um_emp_type_name: string | null;
+    um_employ_type_name: string | null;
+    ent_ret_name: string | null;
+    ent_ret_type_name: string | null;
+    um_pg_name: string | null;
+    is_foreigner: string | null;
+  }>((from, to) =>
+    supabase
+      .from(COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company))
+      .select(
+        "um_emp_type_name, um_employ_type_name, ent_ret_name, ent_ret_type_name, um_pg_name, is_foreigner, emp_id",
+      )
+      .order("emp_id", { ascending: true })
+      .range(from, to),
+  );
 
   if (error) {
     if (isMissingRosterTable(error.message)) {
@@ -309,6 +379,7 @@ async function getFilterOptionsFromTable(
   }[];
 
   return {
+    companies: [],
     empCategories: uniqueSorted(rows.map((r) => r.um_emp_type_name)),
     employTypes: uniqueSorted(rows.map((r) => r.um_employ_type_name)),
     nationalityTypes: ["내국인", "외국인"],
@@ -326,13 +397,14 @@ export async function getEmployeeFilterOptions(
   company: CompanyFilter = "",
 ): Promise<EmployeeFilterOptions> {
   requireSupabase();
+  const companyCodes = await companiesForFilter(parseCompanyFilter(company));
   const lists = await Promise.all(
-    companiesForFilter(parseCompanyFilter(company)).map((code) =>
-      getFilterOptionsFromTable(code),
-    ),
+    companyCodes.map((code) => getFilterOptionsFromTable(code)),
   );
+  const companies = await getCompanies();
 
   return {
+    companies: companies.map((item) => item.code),
     empCategories: uniqueSorted(lists.flatMap((item) => item.empCategories)),
     employTypes: uniqueSorted(lists.flatMap((item) => item.employTypes)),
     nationalityTypes: ["내국인", "외국인"],
@@ -342,4 +414,53 @@ export async function getEmployeeFilterOptions(
     payrollGroups: uniqueSorted(lists.flatMap((item) => item.payrollGroups)),
   };
 }
+
+export async function getEmployeesByKeys(
+  keys: { empNo: string; company: string }[],
+): Promise<Employee[]> {
+  requireSupabase();
+  const asOfDate = todayIsoDate();
+  const grouped = new Map<string, string[]>();
+  for (const key of keys) {
+    const company = parseCompanyFilter(key.company);
+    const empNo = key.empNo.trim();
+    if (!company || !empNo) continue;
+    const list = grouped.get(company) ?? [];
+    list.push(empNo);
+    grouped.set(company, list);
+  }
+
+  const found = new Map<string, Employee>();
+  await Promise.all(
+    [...grouped.entries()].map(async ([company, empNos]) => {
+      const unique = [...new Set(empNos)];
+      const supabase = createServerClient();
+      const table = COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company);
+      for (let i = 0; i < unique.length; i += 100) {
+        const chunk = unique.slice(i, i + 100);
+        const { data, error } = await supabase
+          .from(table)
+          .select(ROSTER_SELECT)
+          .in("emp_id", chunk);
+        if (error) {
+          if (isMissingRosterTable(error.message)) continue;
+          throw new Error(formatSupabaseNetworkError(error.message));
+        }
+        for (const row of (data ?? []) as unknown as RosterRow[]) {
+          const employee = mapEmployee(row, asOfDate, company);
+          found.set(employee.id, employee);
+        }
+      }
+    }),
+  );
+
+  return keys
+    .map((key) => {
+      const company = parseCompanyFilter(key.company);
+      const empNo = key.empNo.trim();
+      return found.get(`${company}:${empNo}`);
+    })
+    .filter((employee): employee is Employee => Boolean(employee));
+}
+
 

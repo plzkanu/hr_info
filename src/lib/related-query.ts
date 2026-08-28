@@ -1,7 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
-import { COMPANY_SEQ, parseCompanyFilter } from "./companies";
+import { getCompanyId } from "./companies-server";
 
 interface FetchRelatedRowsOptions<TRow, TMapped> {
   table: string;
@@ -34,10 +34,9 @@ export async function fetchRelatedRows<TRow, TMapped>({
   const supabase = createServerClient();
   let query = supabase.from(table).select(columns).eq("emp_id", normalizedEmpNo);
 
-  const companyFilter = parseCompanyFilter(company);
-  const companySeq = companyFilter ? COMPANY_SEQ[companyFilter] : undefined;
-  if (companySeq != null) {
-    query = query.eq("company_seq", companySeq);
+  const companyId = await getCompanyId(company);
+  if (companyId != null) {
+    query = query.eq("company_id", companyId);
   }
 
   for (const item of order) {

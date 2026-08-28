@@ -1,13 +1,13 @@
+import "server-only";
+
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseConfigError, isSupabaseConfigured } from "./config";
-import { applySupabaseTlsBypassIfConfigured } from "./fetch";
+import { getSupabaseFetch } from "./fetch";
 
 export function createServerClient(): SupabaseClient {
   if (!isSupabaseConfigured()) {
     throw new Error(getSupabaseConfigError() ?? "Supabase 설정이 없습니다.");
   }
-
-  applySupabaseTlsBypassIfConfigured();
 
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,6 +16,9 @@ export function createServerClient(): SupabaseClient {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
+      },
+      global: {
+        fetch: getSupabaseFetch(),
       },
     },
   );

@@ -30,6 +30,8 @@ function mapEducation(row: EducationRow): EmployeeEducation {
     key: `${row.company_seq}-${row.emp_seq}-${row.academic_seq}`,
     careerName: firstNonEmpty(row.um_sch_career_name),
     schoolName: firstNonEmpty(row.um_sch_name, row.etc_sch_nm),
+    majorFieldName: firstNonEmpty(row.um_major_depart_name),
+    majorCourseName: firstNonEmpty(row.um_major_course_name, row.major_course),
     majorName: firstNonEmpty(
       row.um_major_course_name,
       row.major_course,

@@ -1,6 +1,7 @@
 -- 사원명부 조회 시스템 — 앱 계정·설정
 -- 테이블 접두사: employee_
--- 사원 데이터는 public.ens_emp_roster 를 조회합니다.
+-- 사원 데이터는 public.ens_emp_roster / public.ind_emp_roster 를 조회합니다.
+-- 회사구분(상세 테이블 company_id)은 public.soosan_companies.id 를 사용합니다.
 -- Supabase SQL Editor에서 이 파일을 실행하세요.
 
 -- 이전에 hrinfo_* 로 만든 경우 이름만 변경
@@ -15,6 +16,13 @@ BEGIN
     ALTER TABLE public.hrinfo_app_settings RENAME TO employee_app_settings;
   END IF;
 END $$;
+
+CREATE TABLE IF NOT EXISTS public.soosan_companies (
+  id integer PRIMARY KEY,
+  company_name text NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS employee_users (
   id text PRIMARY KEY,
@@ -437,5 +445,14 @@ CREATE TABLE IF NOT EXISTS public.employee_licenses (
   synced_at timestamp with time zone not null default now(),
   constraint employee_licenses_pkey primary key (company_seq, emp_seq, license_seq)
 );
+
+-- 상세 테이블 회사구분: company_id = soosan_companies.id
+ALTER TABLE public.employee_appointments ADD COLUMN IF NOT EXISTS company_id integer;
+ALTER TABLE public.employee_family ADD COLUMN IF NOT EXISTS company_id integer;
+ALTER TABLE public.employee_education ADD COLUMN IF NOT EXISTS company_id integer;
+ALTER TABLE public.employee_career ADD COLUMN IF NOT EXISTS company_id integer;
+ALTER TABLE public.employee_languages ADD COLUMN IF NOT EXISTS company_id integer;
+ALTER TABLE public.employee_reward_penalty ADD COLUMN IF NOT EXISTS company_id integer;
+ALTER TABLE public.employee_licenses ADD COLUMN IF NOT EXISTS company_id integer;
 
 NOTIFY pgrst, 'reload schema';

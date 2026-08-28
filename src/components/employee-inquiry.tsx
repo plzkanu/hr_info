@@ -1,15 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { EmployeeDetailModal } from "@/components/employee-detail-modal";
+import { EmployeeHrCardPrint } from "@/components/employee-hr-card-print";
 import { todayIsoDate } from "@/lib/format";
-import { COMPANY_CODES, COMPANY_ROSTER_TABLE, parseCompanyFilter, type CompanyFilter } from "@/lib/companies";
+import { COMPANY_CODES, parseCompanyFilter, rosterTableFor, type CompanyFilter } from "@/lib/companies";
 import { hrApi } from "@/lib/hr-api";
+import { HR_CARD_MAX } from "@/lib/hr-card";
 import type {
   Department,
   Employee,
   EmployeeFilterOptions,
+  EmployeeHrCard,
 } from "@/lib/types";
 
 const inputClass =
@@ -95,6 +98,9 @@ export function EmployeeInquiry() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Employee | null>(null);
   const [rosterUnavailable, setRosterUnavailable] = useState(false);
+  const [hrCards, setHrCards] = useState<EmployeeHrCard[]>([]);
+  const [hrCardBusy, setHrCardBusy] = useState(false);
+  const printAfterRender = useRef(false);
 
   const loadMeta = useCallback(async (company: CompanyFilter) => {
     const [deptRes, optRes] = await Promise.all([
@@ -224,13 +230,84 @@ export function EmployeeInquiry() {
     XLSX.writeFile(book, `사원명부_${filters.asOfDate}.xlsx`);
   }
 
+  async function printHrCards(targets: Employee[]) {
+    if (targets.length === 0) {
+      setError("인사카드를 출력할 사원을 선택하세요.");
+      return;
+    }
+    const limited = targets.slice(0, HR_CARD_MAX);
+    setHrCardBusy(true);
+    setError("");
+    try {
+      const response = await fetch(hrApi("/employees/hr-cards"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employees: limited.map((emp) => ({
+            empNo: emp.empNo,
+            company: emp.companyCode,
+          })),
+        }),
+      });
+      const data = (await response.json()) as {
+        cards?: EmployeeHrCard[];
+        truncated?: boolean;
+        max?: number;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "인사카드를 불러오지 못했습니다.");
+      }
+      const cards = data.cards ?? [];
+      if (cards.length === 0) {
+        throw new Error("출력할 인사카드 데이터가 없습니다.");
+      }
+      printAfterRender.current = true;
+      setHrCards(cards);
+      setDetail(null);
+      if (targets.length > HR_CARD_MAX) {
+        setError(
+          `한 번에 최대 ${HR_CARD_MAX}명까지 출력합니다. 나머지 인원은 다시 선택해 주세요.`,
+        );
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "인사카드 출력에 실패했습니다.",
+      );
+      setHrCardBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!printAfterRender.current || hrCards.length === 0) return;
+    printAfterRender.current = false;
+    document.body.classList.add("printing-hr-card");
+    const timer = window.setTimeout(() => {
+      window.print();
+      document.body.classList.remove("printing-hr-card");
+      setHrCardBusy(false);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [hrCards]);
+
+  useEffect(() => {
+    function onAfterPrint() {
+      document.body.classList.remove("printing-hr-card");
+    }
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => window.removeEventListener("afterprint", onAfterPrint);
+  }, []);
+
   const empCategories = options?.empCategories ?? [];
   const employmentStatuses = options?.employmentStatuses?.length
     ? options.employmentStatuses
     : ["재직자", "퇴직자"];
+  const companyCodes =
+    options?.companies?.length ? options.companies : [...COMPANY_CODES];
 
   return (
     <div className="space-y-4">
+      <div className="inquiry-screen space-y-4">
       <div className="no-print flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -253,6 +330,17 @@ export function EmployeeInquiry() {
           className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-100"
         >
           출력
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const selected = employees.filter((emp) => selectedIds.has(emp.id));
+            void printHrCards(selected);
+          }}
+          disabled={hrCardBusy || employees.length === 0}
+          className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
+        >
+          {hrCardBusy ? "준비 중..." : "인사카드"}
         </button>
         <button
           type="button"
@@ -292,7 +380,7 @@ export function EmployeeInquiry() {
               className={inputClass}
             >
               <option value="">전체</option>
-              {COMPANY_CODES.map((code) => (
+              {companyCodes.map((code) => (
                 <option key={code} value={code}>
                   {code}
                 </option>
@@ -409,7 +497,7 @@ export function EmployeeInquiry() {
           <p className="px-6 py-12 text-center text-sm text-slate-500">
             {rosterUnavailable
               ? filters.company
-                ? `${filters.company} 사원명부(${COMPANY_ROSTER_TABLE[filters.company]})가 아직 준비되지 않았습니다.`
+                ? `${filters.company} 사원명부(${rosterTableFor(filters.company)})가 아직 준비되지 않았습니다.`
                 : "조회 가능한 사원명부가 아직 준비되지 않았습니다."
               : "조회 결과가 없습니다."}
           </p>
@@ -427,7 +515,6 @@ export function EmployeeInquiry() {
                 <col className="w-[13%]" />
                 <col className="w-[7%]" />
                 <col className="w-[64px]" />
-                <col className="w-[8%]" />
                 <col className="w-[72px]" />
                 <col className="w-[88px]" />
                 <col className="w-[108px]" />
@@ -472,9 +559,6 @@ export function EmployeeInquiry() {
                   </th>
                   <th className="whitespace-nowrap px-1.5 py-2 font-medium">
                     사번
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    영문이름
                   </th>
                   <th className="whitespace-nowrap px-1.5 py-2 font-medium">
                     사원구분
@@ -535,9 +619,6 @@ export function EmployeeInquiry() {
                       {emp.position}
                     </td>
                     <td className="truncate px-1.5 py-1.5">{emp.empNo}</td>
-                    <td className="truncate px-1.5 py-1.5" title={emp.englishName}>
-                      {emp.englishName}
-                    </td>
                     <td className="truncate px-1.5 py-1.5">{emp.empCategory}</td>
                     <td className="truncate px-1.5 py-1.5">
                       <span
@@ -569,8 +650,12 @@ export function EmployeeInquiry() {
         <EmployeeDetailModal
           employee={detail}
           onClose={() => setDetail(null)}
+          onPrintHrCard={() => void printHrCards([detail])}
+          hrCardBusy={hrCardBusy}
         />
       ) : null}
+      </div>
+      <EmployeeHrCardPrint cards={hrCards} />
     </div>
   );
 }

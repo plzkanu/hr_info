@@ -1,7 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
-import { COMPANY_SEQ, parseCompanyFilter } from "./companies";
+import { getCompanyId } from "./companies-server";
 import { formatDate, isTruthyFlag } from "./format";
 import type { EmployeeFamilyMember } from "./types";
 
@@ -80,10 +80,9 @@ export async function getEmployeeFamily(
     .order("family_seq", { ascending: true })
     .limit(200);
 
-  const companyFilter = parseCompanyFilter(company);
-  const companySeq = companyFilter ? COMPANY_SEQ[companyFilter] : undefined;
-  if (companySeq != null) {
-    query = query.eq("company_seq", companySeq);
+  const companyId = await getCompanyId(company);
+  if (companyId != null) {
+    query = query.eq("company_id", companyId);
   }
 
   const { data, error } = await query;

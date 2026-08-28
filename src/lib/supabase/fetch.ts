@@ -1,4 +1,31 @@
+import { Agent, fetch as undiciFetch } from "undici";
 import { isSupabaseTlsInsecure } from "./config";
+
+/** PostgREST 기본 max-rows(1000)를 넘기려면 range 페이징이 필요합니다. */
+export const SUPABASE_PAGE_SIZE = 1000;
+
+export async function fetchAllRows<T>(
+  fetchPage: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const all: T[] = [];
+  let from = 0;
+  while (from < 100_000) {
+    const { data, error } = await fetchPage(from, from + SUPABASE_PAGE_SIZE - 1);
+    if (error) {
+      return { data: all, error };
+    }
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < SUPABASE_PAGE_SIZE) {
+      break;
+    }
+    from += SUPABASE_PAGE_SIZE;
+  }
+  return { data: all, error: null };
+}
 
 export function formatSupabaseNetworkError(message: string): string {
   const normalized = message.toLowerCase();
@@ -17,8 +44,8 @@ export function formatSupabaseNetworkError(message: string): string {
     normalized.includes("schema cache")
   ) {
     return (
-      "Supabase에 필요한 테이블이 없습니다. 사원명부는 ens_emp_roster, " +
-      "로그인 계정은 employee_users, 인사상세는 employee_appointments / " +
+      "Supabase에 필요한 테이블이 없습니다. 사원명부는 ens_emp_roster / ind_emp_roster, " +
+      "회사구분은 soosan_companies, 로그인 계정은 employee_users, 인사상세는 employee_appointments / " +
       "employee_family / employee_education / employee_licenses / employee_career / " +
       "employee_languages / employee_reward_penalty 입니다. SQL Editor에서 " +
       "supabase/apply-all-migrations.sql을 실행하세요."
@@ -40,17 +67,29 @@ export function formatSupabaseNetworkError(message: string): string {
   return message;
 }
 
-let supabaseTlsBypassApplied = false;
+let insecureFetch: typeof globalThis.fetch | null = null;
 
-export function applySupabaseTlsBypassIfConfigured(): void {
-  if (supabaseTlsBypassApplied || !isSupabaseTlsInsecure()) {
-    return;
+/**
+ * SUPABASE_SSL_VERIFY=0 일 때 인증서 검증만 생략합니다.
+ * NODE_TLS_REJECT_UNAUTHORIZED 를 바꾸면 Next.js가 경고를 페이지 에러로 띄웁니다.
+ */
+export function getSupabaseFetch(): typeof globalThis.fetch {
+  if (!isSupabaseTlsInsecure()) {
+    return globalThis.fetch.bind(globalThis);
   }
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  supabaseTlsBypassApplied = true;
-  if (process.env.NODE_ENV !== "production") {
-    console.warn(
-      "[supabase] SUPABASE_SSL_VERIFY=0 — TLS 인증서 검증을 생략합니다.",
-    );
+  if (insecureFetch) {
+    return insecureFetch;
   }
+
+  const dispatcher = new Agent({
+    connect: { rejectUnauthorized: false },
+  });
+
+  insecureFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
+    undiciFetch(input as Parameters<typeof undiciFetch>[0], {
+      ...(init as object),
+      dispatcher,
+    })) as unknown as typeof globalThis.fetch;
+
+  return insecureFetch;
 }

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/next-build.mjs",
     "build:prod": "node scripts/build-prod.mjs",
     "start": "next start --hostname 0.0.0.0",
     "start:prod": "node scripts/start-prod.mjs",
@@ -26,6 +26,7 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "undici": "^8.10.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

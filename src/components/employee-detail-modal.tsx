@@ -29,6 +29,8 @@ type TabId = (typeof TABS)[number]["id"];
 interface EmployeeDetailModalProps {
   employee: Employee;
   onClose: () => void;
+  onPrintHrCard?: () => void;
+  hrCardBusy?: boolean;
 }
 
 const PROFILE_SECTIONS: { title: string; fields: { label: string; value: (e: Employee) => string }[] }[] = [
@@ -75,6 +77,8 @@ const PROFILE_SECTIONS: { title: string; fields: { label: string; value: (e: Emp
 export function EmployeeDetailModal({
   employee,
   onClose,
+  onPrintHrCard,
+  hrCardBusy = false,
 }: EmployeeDetailModalProps) {
   const [tab, setTab] = useState<TabId>("profile");
   const initial = employee.name.trim().charAt(0) || employee.empNo.charAt(0);
@@ -93,7 +97,7 @@ export function EmployeeDetailModal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-[2px]">
+    <div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-[2px]">
       <div
         role="dialog"
         aria-modal="true"
@@ -131,6 +135,16 @@ export function EmployeeDetailModal({
                 .join("  ·  ")}
             </p>
           </div>
+          {onPrintHrCard ? (
+            <button
+              type="button"
+              onClick={onPrintHrCard}
+              disabled={hrCardBusy}
+              className="rounded-full border border-white/20 px-3 py-1.5 text-[12px] font-medium text-white/90 transition hover:bg-white/10 disabled:opacity-50"
+            >
+              {hrCardBusy ? "준비 중..." : "인사카드"}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}

@@ -1,14 +1,15 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
+import { fetchAllRows, formatSupabaseNetworkError } from "@/lib/supabase/fetch";
 import {
   COMPANY_ROSTER_TABLE,
-  companiesForFilter,
   isMissingRosterTable,
   parseCompanyFilter,
+  rosterTableFor,
   type CompanyCode,
   type CompanyFilter,
 } from "./companies";
+import { companiesForFilter } from "./companies-server";
 import type { Department } from "./types";
 
 function requireSupabase() {
@@ -21,10 +22,16 @@ async function getDepartmentsFromTable(
   company: CompanyCode,
 ): Promise<Department[]> {
   const supabase = createServerClient();
-  const { data, error } = await supabase
-    .from(COMPANY_ROSTER_TABLE[company])
-    .select("dept_name, dept_full_name")
-    .limit(10000);
+  const { data, error } = await fetchAllRows<{
+    dept_name: string | null;
+    dept_full_name: string | null;
+  }>((from, to) =>
+    supabase
+      .from(COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company))
+      .select("dept_name, dept_full_name, emp_id")
+      .order("emp_id", { ascending: true })
+      .range(from, to),
+  );
 
   if (error) {
     if (isMissingRosterTable(error.message)) {
@@ -52,7 +59,9 @@ export async function getAllDepartments(
   requireSupabase();
   const filter = parseCompanyFilter(company);
   const lists = await Promise.all(
-    companiesForFilter(filter).map((code) => getDepartmentsFromTable(code)),
+    (await companiesForFilter(filter)).map((code) =>
+      getDepartmentsFromTable(code),
+    ),
   );
 
   const byName = new Map<string, Department>();

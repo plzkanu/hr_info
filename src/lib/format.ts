@@ -111,3 +111,26 @@ export function isTruthyFlag(value: string | null | undefined): boolean {
 export function nationalityLabel(isForeigner: string | null | undefined): string {
   return isTruthyFlag(isForeigner) ? "외국인" : "내국인";
 }
+
+export function marriageLabel(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  return isTruthyFlag(trimmed) ? "기혼" : "미혼";
+}
+
+export function applicableLabel(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  return isTruthyFlag(trimmed) ? "해당" : "해당무";
+}
+
+export function formatAddress(
+  zip: string | null | undefined,
+  address: string | null | undefined,
+): string {
+  const z = (zip ?? "").trim();
+  const a = (address ?? "").trim();
+  if (z && a) return `(${z}) ${a}`;
+  return a || (z ? `(${z})` : "");
+}
+
