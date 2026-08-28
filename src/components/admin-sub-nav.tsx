@@ -15,7 +15,8 @@ export function AdminSubNav() {
       <ul className="flex flex-row gap-2 sm:flex-col sm:gap-1">
         {adminSubNavItems.map((item) => {
           const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+            pathname === item.href ||
+            (pathname?.startsWith(`${item.href}/`) ?? false);
 
           return (
             <li key={item.href}>

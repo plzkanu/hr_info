@@ -63,7 +63,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           메뉴
         </p>
         {items.map((item) => {
-          const isActive = isNavActive(pathname, item.href);
+          const isActive = isNavActive(pathname ?? "", item.href);
           return (
             <Link
               key={item.href}
