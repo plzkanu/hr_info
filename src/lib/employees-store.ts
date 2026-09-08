@@ -135,6 +135,32 @@ function requireSupabase() {
   }
 }
 
+function rosterJobGrade(row: RosterRow): string {
+  return (row.um_jp_name ?? "").trim();
+}
+
+function usesCompactRosterDates(company: CompanyCode): boolean {
+  const table = COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company);
+  return table === "ind_emp_roster";
+}
+
+function toRosterDateFilter(value: string, company: CompanyCode): string {
+  const iso = formatDate(value);
+  if (!iso) return value.trim();
+  return usesCompactRosterDates(company) ? iso.replace(/-/g, "") : iso;
+}
+
+function inIsoDateRange(
+  value: string | null,
+  from: string,
+  to: string,
+): boolean {
+  if (!value) return false;
+  if (from && value < from) return false;
+  if (to && value > to) return false;
+  return true;
+}
+
 function mapEmployee(
   row: RosterRow,
   asOfDate: string,
@@ -157,7 +183,7 @@ function mapEmployee(
     companyCode: company,
     companyName: (row.company_name ?? "").trim() || company,
     position: (row.um_jd_name ?? "").trim(),
-    jobGrade: (row.um_jp_name ?? "").trim(),
+    jobGrade: rosterJobGrade(row),
     empCategory: row.um_emp_type_name ?? "",
     employType: row.um_employ_type_name ?? "",
     nationalityType: nationalityLabel(row.is_foreigner),
@@ -235,16 +261,16 @@ async function searchOneCompany(
       query = query.ilike("emp_name", `%${filters.empName}%`);
     }
     if (filters.hireDateFrom) {
-      query = query.gte("ent_date", filters.hireDateFrom);
+      query = query.gte("ent_date", toRosterDateFilter(filters.hireDateFrom, company));
     }
     if (filters.hireDateTo) {
-      query = query.lte("ent_date", filters.hireDateTo);
+      query = query.lte("ent_date", toRosterDateFilter(filters.hireDateTo, company));
     }
     if (filters.resignDateFrom) {
-      query = query.gte("retire_date", filters.resignDateFrom);
+      query = query.gte("retire_date", toRosterDateFilter(filters.resignDateFrom, company));
     }
     if (filters.resignDateTo) {
-      query = query.lte("retire_date", filters.resignDateTo);
+      query = query.lte("retire_date", toRosterDateFilter(filters.resignDateTo, company));
     }
     if (filters.nationalityType === "외국인") {
       query = query.eq("is_foreigner", "1");
@@ -271,6 +297,15 @@ async function searchOneCompany(
         query = query.eq("dept_name", filters.departmentName);
       }
     }
+    if (filters.jobGrade) {
+      query = query.eq("um_jp_name", filters.jobGrade);
+    }
+    if (filters.position) {
+      query = query.eq("um_jd_name", filters.position);
+    }
+    if (filters.gender) {
+      query = query.eq("sm_sex_name", filters.gender);
+    }
 
     return query;
   });
@@ -291,6 +326,19 @@ async function searchOneCompany(
     );
   } else {
     rows = rows.filter((row) => row.employmentStatus !== "");
+  }
+
+  const hireFrom = formatDate(filters.hireDateFrom);
+  const hireTo = formatDate(filters.hireDateTo);
+  if (hireFrom || hireTo) {
+    rows = rows.filter((row) => inIsoDateRange(row.hireDate, hireFrom, hireTo));
+  }
+  const resignFrom = formatDate(filters.resignDateFrom);
+  const resignTo = formatDate(filters.resignDateTo);
+  if (resignFrom || resignTo) {
+    rows = rows.filter((row) =>
+      inIsoDateRange(row.resignDate, resignFrom, resignTo),
+    );
   }
 
   return { employees: rows, rosterUnavailable: false };
@@ -333,6 +381,9 @@ const emptyFilterOptions = (): EmployeeFilterOptions => ({
   nationalityTypes: ["내국인", "외국인"],
   employmentStatuses: ["재직자", "퇴직자"],
   payrollGroups: [],
+  positions: [],
+  jobGrades: [],
+  genders: [],
 });
 
 function uniqueSorted(values: (string | null | undefined)[]) {
@@ -351,12 +402,15 @@ async function getFilterOptionsFromTable(
     ent_ret_name: string | null;
     ent_ret_type_name: string | null;
     um_pg_name: string | null;
+    um_jp_name: string | null;
+    um_jd_name: string | null;
+    sm_sex_name: string | null;
     is_foreigner: string | null;
   }>((from, to) =>
     supabase
       .from(COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company))
       .select(
-        "um_emp_type_name, um_employ_type_name, ent_ret_name, ent_ret_type_name, um_pg_name, is_foreigner, emp_id",
+        "um_emp_type_name, um_employ_type_name, ent_ret_name, ent_ret_type_name, um_pg_name, um_jp_name, um_jd_name, sm_sex_name, is_foreigner, emp_id",
       )
       .order("emp_id", { ascending: true })
       .range(from, to),
@@ -375,6 +429,9 @@ async function getFilterOptionsFromTable(
     ent_ret_name: string | null;
     ent_ret_type_name: string | null;
     um_pg_name: string | null;
+    um_jp_name: string | null;
+    um_jd_name: string | null;
+    sm_sex_name: string | null;
     is_foreigner: string | null;
   }[];
 
@@ -390,6 +447,9 @@ async function getFilterOptionsFromTable(
       "퇴직자",
     ]),
     payrollGroups: uniqueSorted(rows.map((r) => r.um_pg_name)),
+    positions: uniqueSorted(rows.map((r) => r.um_jd_name)),
+    jobGrades: uniqueSorted(rows.map((r) => r.um_jp_name)),
+    genders: uniqueSorted(rows.map((r) => r.sm_sex_name)),
   };
 }
 
@@ -412,6 +472,9 @@ export async function getEmployeeFilterOptions(
       lists.flatMap((item) => item.employmentStatuses),
     ),
     payrollGroups: uniqueSorted(lists.flatMap((item) => item.payrollGroups)),
+    positions: uniqueSorted(lists.flatMap((item) => item.positions)),
+    jobGrades: uniqueSorted(lists.flatMap((item) => item.jobGrades)),
+    genders: uniqueSorted(lists.flatMap((item) => item.genders)),
   };
 }
 
@@ -461,6 +524,47 @@ export async function getEmployeesByKeys(
       return found.get(`${company}:${empNo}`);
     })
     .filter((employee): employee is Employee => Boolean(employee));
+}
+
+function formatSyncedAtDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatDate(value);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+const ROSTER_SYNC_TABLES = ["ens_emp_roster", "ind_emp_roster"] as const;
+
+export async function getLatestRosterSyncedAt(): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = createServerClient();
+  const timestamps = (
+    await Promise.all(
+      ROSTER_SYNC_TABLES.map(async (table) => {
+        const { data, error } = await supabase
+          .from(table)
+          .select("synced_at")
+          .order("synced_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) {
+          if (isMissingRosterTable(error.message)) return null;
+          return null;
+        }
+        const syncedAt = (data as { synced_at?: string | null } | null)
+          ?.synced_at;
+        return syncedAt?.trim() || null;
+      }),
+    )
+  ).filter((value): value is string => Boolean(value));
+
+  if (timestamps.length === 0) return null;
+  timestamps.sort();
+  return formatSyncedAtDate(timestamps[timestamps.length - 1]);
 }
 
 

@@ -132,6 +132,9 @@ export interface EmployeeFilters {
   employmentStatus: string;
   departmentName: string;
   includeSubDepartments: boolean;
+  position: string;
+  jobGrade: string;
+  gender: string;
   payrollGroup: string;
   englishName: string;
   remarks: string;
@@ -145,6 +148,9 @@ export interface EmployeeFilterOptions {
   nationalityTypes: string[];
   employmentStatuses: string[];
   payrollGroups: string[];
+  positions: string[];
+  jobGrades: string[];
+  genders: string[];
 }
 
 export interface EmployeeAppointment {

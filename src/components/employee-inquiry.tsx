@@ -19,6 +19,96 @@ const inputClass =
   "min-w-0 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-[#009ada] focus:ring-1 focus:ring-[#009ada]/20";
 const labelClass = "mb-1 block text-[11px] font-medium text-slate-600";
 
+type SortKey =
+  | "companyCode"
+  | "departmentName"
+  | "position"
+  | "jobGrade"
+  | "name"
+  | "hireDate"
+  | "resignDate"
+  | "email"
+  | "empNo"
+  | "empCategory"
+  | "employmentStatus"
+  | "residentId"
+  | "gender"
+  | "birthDate"
+  | "calendarType"
+  | "age";
+
+type SortDir = "asc" | "desc";
+
+interface SortRule {
+  key: SortKey;
+  dir: SortDir;
+}
+
+function sortValue(emp: Employee, key: SortKey): string | number {
+  const value = emp[key];
+  if (value == null) return "";
+  return value;
+}
+
+function compareSortValues(a: string | number, b: string | number): number {
+  if (a === "" && b === "") return 0;
+  if (a === "") return 1;
+  if (b === "") return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b), "ko", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function nextSorts(prev: SortRule[], key: SortKey): SortRule[] {
+  const index = prev.findIndex((rule) => rule.key === key);
+  if (index < 0) return [...prev, { key, dir: "asc" }];
+  if (prev[index].dir === "asc") {
+    return prev.map((rule, i) => (i === index ? { ...rule, dir: "desc" } : rule));
+  }
+  return prev.filter((_, i) => i !== index);
+}
+
+const SORT_POPUP_MIN_MS = 2000;
+
+function SortableTh({
+  label,
+  sortKey,
+  sorts,
+  onToggle,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sorts: SortRule[];
+  onToggle: (key: SortKey) => void;
+}) {
+  const index = sorts.findIndex((rule) => rule.key === sortKey);
+  const rule = index >= 0 ? sorts[index] : null;
+  return (
+    <th
+      className="select-none whitespace-nowrap px-1.5 py-2 font-medium"
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        onToggle(sortKey);
+      }}
+      title="더블클릭: 오름차순 → 내림차순 → 정렬 해제"
+    >
+      <span className="inline-flex cursor-pointer items-center gap-0.5 hover:text-slate-700">
+        {label}
+        {rule ? (
+          <span className="text-[#004b87]">
+            {rule.dir === "asc" ? "▲" : "▼"}
+            {sorts.length > 1 ? (
+              <span className="ml-px text-[9px]">{index + 1}</span>
+            ) : null}
+          </span>
+        ) : null}
+      </span>
+    </th>
+  );
+}
+
 interface FilterState {
   company: CompanyFilter;
   asOfDate: string;
@@ -34,6 +124,9 @@ interface FilterState {
   employmentStatus: string;
   departmentName: string;
   includeSubDepartments: boolean;
+  position: string;
+  jobGrade: string;
+  gender: string;
   payrollGroup: string;
   englishName: string;
   remarks: string;
@@ -55,6 +148,9 @@ const emptyFilters = (): FilterState => ({
   employmentStatus: "재직자",
   departmentName: "",
   includeSubDepartments: false,
+  position: "",
+  jobGrade: "",
+  gender: "",
   payrollGroup: "",
   englishName: "",
   remarks: "",
@@ -79,6 +175,9 @@ function toQuery(filters: FilterState): string {
   set("nationalityType", filters.nationalityType);
   set("employmentStatus", filters.employmentStatus);
   set("departmentName", filters.departmentName);
+  set("position", filters.position);
+  set("jobGrade", filters.jobGrade);
+  set("gender", filters.gender);
   set("payrollGroup", filters.payrollGroup);
   set("englishName", filters.englishName);
   set("remarks", filters.remarks);
@@ -100,7 +199,12 @@ export function EmployeeInquiry() {
   const [rosterUnavailable, setRosterUnavailable] = useState(false);
   const [hrCards, setHrCards] = useState<EmployeeHrCard[]>([]);
   const [hrCardBusy, setHrCardBusy] = useState(false);
+  const [sorts, setSorts] = useState<SortRule[]>([]);
+  const [sortBusy, setSortBusy] = useState(false);
+  const [sortTick, setSortTick] = useState(0);
   const printAfterRender = useRef(false);
+  const sortStartedAt = useRef(0);
+  const sortDeferTimer = useRef<number | null>(null);
 
   const loadMeta = useCallback(async (company: CompanyFilter) => {
     const [deptRes, optRes] = await Promise.all([
@@ -159,6 +263,9 @@ export function EmployeeInquiry() {
       company,
       departmentName: "",
       empCategory: "",
+      position: "",
+      jobGrade: "",
+      gender: "",
     }));
     void loadMeta(company);
   }
@@ -176,12 +283,69 @@ export function EmployeeInquiry() {
     setFilters(next);
     void loadMeta(next.company);
     void loadEmployees(next);
+    setSorts([]);
+    setSortBusy(false);
   }
 
   const allSelected = useMemo(
     () => employees.length > 0 && employees.every((e) => selectedIds.has(e.id)),
     [employees, selectedIds],
   );
+
+  const companyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const emp of employees) {
+      if (!emp.companyCode) continue;
+      counts.set(emp.companyCode, (counts.get(emp.companyCode) ?? 0) + 1);
+    }
+    const codes = [...new Set(["IND", "ENS", ...counts.keys()])];
+    return codes.map((code) => ({
+      code,
+      count: counts.get(code) ?? 0,
+    }));
+  }, [employees]);
+
+  const sortedEmployees = useMemo(() => {
+    if (sorts.length === 0) return employees;
+    return [...employees].sort((a, b) => {
+      for (const { key, dir } of sorts) {
+        const cmp = compareSortValues(sortValue(a, key), sortValue(b, key));
+        if (cmp !== 0) return dir === "asc" ? cmp : -cmp;
+      }
+      return 0;
+    });
+  }, [employees, sorts]);
+
+  function toggleSort(key: SortKey) {
+    setSortBusy(true);
+    sortStartedAt.current = Date.now();
+    if (sortDeferTimer.current != null) {
+      window.clearTimeout(sortDeferTimer.current);
+    }
+    sortDeferTimer.current = window.setTimeout(() => {
+      sortDeferTimer.current = null;
+      setSorts((prev) => nextSorts(prev, key));
+      setSortTick((n) => n + 1);
+    }, 50);
+  }
+
+  useEffect(() => {
+    if (sortTick === 0) return;
+    const remaining = Math.max(
+      0,
+      SORT_POPUP_MIN_MS - (Date.now() - sortStartedAt.current),
+    );
+    const timer = window.setTimeout(() => setSortBusy(false), remaining);
+    return () => window.clearTimeout(timer);
+  }, [sortTick]);
+
+  useEffect(() => {
+    return () => {
+      if (sortDeferTimer.current != null) {
+        window.clearTimeout(sortDeferTimer.current);
+      }
+    };
+  }, []);
 
   function toggleAll() {
     if (allSelected) {
@@ -201,15 +365,16 @@ export function EmployeeInquiry() {
   }
 
   function exportExcel() {
-    const rows = employees.map((e, index) => ({
+    const rows = sortedEmployees.map((e, index) => ({
       번호: index + 1,
       회사: e.companyCode,
       부서: e.departmentName,
+      직책: e.position,
+      직급: e.jobGrade,
       사원: e.name,
       입사일: e.hireDate ?? "",
       퇴사일: e.resignDate ?? "",
       이메일: e.email,
-      직책: e.position,
       사번: e.empNo,
       영문이름: e.englishName,
       사원구분: e.empCategory,
@@ -299,6 +464,11 @@ export function EmployeeInquiry() {
   }, []);
 
   const empCategories = options?.empCategories ?? [];
+  const positions = options?.positions ?? [];
+  const jobGrades = options?.jobGrades ?? [];
+  const genders = options?.genders?.length
+    ? options.genders
+    : ["남자", "여자"];
   const employmentStatuses = options?.employmentStatuses?.length
     ? options.employmentStatuses
     : ["재직자", "퇴직자"];
@@ -306,12 +476,12 @@ export function EmployeeInquiry() {
     options?.companies?.length ? options.companies : [...COMPANY_CODES];
 
   return (
-    <div className="space-y-4">
-      <div className="inquiry-screen space-y-4">
-      <div className="no-print flex flex-wrap items-center gap-2">
+    <div className="flex min-h-0 flex-1 flex-col print:h-auto print:overflow-visible">
+      <div className="inquiry-screen flex min-h-0 flex-1 flex-col gap-4 print:h-auto print:overflow-visible">
+      <div className="no-print flex shrink-0 flex-wrap items-center gap-2">
         <button
-          type="button"
-          onClick={() => handleSearch()}
+          type="submit"
+          form="inquiry-filters"
           className="rounded-lg bg-[#004b87] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#003a6b]"
         >
           조회
@@ -355,22 +525,46 @@ export function EmployeeInquiry() {
             {employees.length.toLocaleString("ko-KR")}
           </span>
           명
+          {companyCounts.length > 0 ? (
+            <>
+              {" "}
+              (
+              {companyCounts.map((item, index) => (
+                <span key={item.code}>
+                  {index > 0 ? ", " : ""}
+                  {item.code} : {item.count.toLocaleString("ko-KR")}명
+                </span>
+              ))}
+              )
+            </>
+          ) : null}
         </p>
       </div>
 
       {error ? (
-        <p className="no-print rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+        <p className="no-print shrink-0 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
           {error}
         </p>
       ) : null}
 
       <form
+        id="inquiry-filters"
         onSubmit={handleSearch}
-        className="no-print w-full rounded-xl border border-slate-200 bg-white shadow-sm"
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          if (event.nativeEvent.isComposing) return;
+          if (!(event.target instanceof HTMLInputElement)) return;
+          event.preventDefault();
+          handleSearch();
+        }}
+        className="no-print w-full shrink-0 rounded-xl border border-slate-200 bg-white shadow-sm"
       >
         <div className="border-b border-slate-100 px-4 py-2.5">
           <h2 className="text-sm font-semibold text-slate-800">조회조건</h2>
         </div>
+        <button type="submit" className="sr-only">
+          조회
+        </button>
         <div className="flex w-full items-end gap-3 px-5 py-4">
           <div className="min-w-0 flex-[0.9]">
             <label className={labelClass}>회사구분</label>
@@ -396,6 +590,36 @@ export function EmployeeInquiry() {
             >
               <option value="">전체</option>
               {empCategories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0 flex-1">
+            <label className={labelClass}>직책</label>
+            <select
+              value={draft.position}
+              onChange={(e) => patchDraft("position", e.target.value)}
+              className={inputClass}
+            >
+              <option value="">전체</option>
+              {positions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0 flex-1">
+            <label className={labelClass}>직급</label>
+            <select
+              value={draft.jobGrade}
+              onChange={(e) => patchDraft("jobGrade", e.target.value)}
+              className={inputClass}
+            >
+              <option value="">전체</option>
+              {jobGrades.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
@@ -470,6 +694,21 @@ export function EmployeeInquiry() {
               ))}
             </select>
           </div>
+          <div className="min-w-0 flex-[0.8]">
+            <label className={labelClass}>성별</label>
+            <select
+              value={draft.gender}
+              onChange={(e) => patchDraft("gender", e.target.value)}
+              className={inputClass}
+            >
+              <option value="">전체</option>
+              {genders.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="min-w-0 flex-[1.5]">
             <label className={labelClass}>부서</label>
             <select
@@ -488,7 +727,7 @@ export function EmployeeInquiry() {
         </div>
       </form>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm print:h-auto print:overflow-visible">
         {isLoading ? (
           <p className="px-6 py-12 text-center text-sm text-slate-500">
             불러오는 중...
@@ -503,17 +742,18 @@ export function EmployeeInquiry() {
           </p>
         ) : (
           <div>
-            <table className="w-full table-fixed text-left text-[12px] leading-5">
+            <table className="w-full table-fixed text-left text-[13px] leading-[21px]">
               <colgroup>
                 <col className="w-[36px]" />
                 <col className="w-[28px]" />
                 <col className="w-[44px]" />
                 <col className="w-[11%]" />
+                <col className="w-[72px]" />
+                <col className="w-[72px]" />
                 <col className="w-[7%]" />
                 <col className="w-[78px]" />
                 <col className="w-[78px]" />
                 <col className="w-[13%]" />
-                <col className="w-[7%]" />
                 <col className="w-[64px]" />
                 <col className="w-[72px]" />
                 <col className="w-[88px]" />
@@ -523,7 +763,7 @@ export function EmployeeInquiry() {
                 <col className="w-[40px]" />
                 <col className="w-[36px]" />
               </colgroup>
-              <thead className="bg-slate-50 text-[11px] text-slate-500">
+              <thead className="sticky top-0 z-10 bg-slate-50 text-[12px] text-slate-500">
                 <tr>
                   <th className="whitespace-nowrap px-1.5 py-2 font-medium">
                     No
@@ -536,55 +776,106 @@ export function EmployeeInquiry() {
                       aria-label="전체 선택"
                     />
                   </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    회사
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    부서
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    사원
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    입사일
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    퇴사일
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    이메일
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    직책
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    사번
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    사원구분
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    재직/퇴직구분
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    주민등록번호
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    성별
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    생년월일
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    양/음
-                  </th>
-                  <th className="whitespace-nowrap px-1.5 py-2 font-medium">
-                    나이
-                  </th>
+                  <SortableTh
+                    label="회사"
+                    sortKey="companyCode"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="부서"
+                    sortKey="departmentName"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="직책"
+                    sortKey="position"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="직급"
+                    sortKey="jobGrade"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="사원"
+                    sortKey="name"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="입사일"
+                    sortKey="hireDate"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="퇴사일"
+                    sortKey="resignDate"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="이메일"
+                    sortKey="email"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="사번"
+                    sortKey="empNo"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="사원구분"
+                    sortKey="empCategory"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="재직/퇴직구분"
+                    sortKey="employmentStatus"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="주민등록번호"
+                    sortKey="residentId"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="성별"
+                    sortKey="gender"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="생년월일"
+                    sortKey="birthDate"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="양/음"
+                    sortKey="calendarType"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
+                  <SortableTh
+                    label="나이"
+                    sortKey="age"
+                    sorts={sorts}
+                    onToggle={toggleSort}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {employees.map((emp, index) => (
+                {sortedEmployees.map((emp, index) => (
                   <tr key={emp.id} className="hover:bg-slate-50/80">
                     <td className="whitespace-nowrap px-1.5 py-1.5 text-slate-400">
                       {index + 1}
@@ -601,6 +892,12 @@ export function EmployeeInquiry() {
                     <td className="truncate px-1.5 py-1.5" title={emp.departmentName}>
                       {emp.departmentName}
                     </td>
+                    <td className="truncate px-1.5 py-1.5" title={emp.position}>
+                      {emp.position}
+                    </td>
+                    <td className="truncate px-1.5 py-1.5" title={emp.jobGrade}>
+                      {emp.jobGrade}
+                    </td>
                     <td className="truncate px-1.5 py-1.5">
                       <button
                         type="button"
@@ -615,14 +912,11 @@ export function EmployeeInquiry() {
                     <td className="truncate px-1.5 py-1.5" title={emp.email}>
                       {emp.email}
                     </td>
-                    <td className="truncate px-1.5 py-1.5" title={emp.position}>
-                      {emp.position}
-                    </td>
                     <td className="truncate px-1.5 py-1.5">{emp.empNo}</td>
                     <td className="truncate px-1.5 py-1.5">{emp.empCategory}</td>
                     <td className="truncate px-1.5 py-1.5">
                       <span
-                        className={`rounded-full px-1.5 py-px text-[10px] font-medium ${
+                        className={`rounded-full px-1.5 py-px text-[11px] font-medium ${
                           emp.employmentStatus === "재직자"
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-slate-100 text-slate-600"
@@ -631,7 +925,7 @@ export function EmployeeInquiry() {
                         {emp.employmentStatus}
                       </span>
                     </td>
-                    <td className="truncate px-1.5 py-1.5 font-mono text-[11px]">
+                    <td className="truncate px-1.5 py-1.5 font-mono text-[12px]">
                       {emp.residentId}
                     </td>
                     <td className="truncate px-1.5 py-1.5">{emp.gender}</td>
@@ -653,6 +947,13 @@ export function EmployeeInquiry() {
           onPrintHrCard={() => void printHrCards([detail])}
           hrCardBusy={hrCardBusy}
         />
+      ) : null}
+      {sortBusy ? (
+        <div className="no-print fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40">
+          <div className="rounded-2xl bg-white px-10 py-8 shadow-xl">
+            <p className="text-sm font-semibold text-slate-800">정렬 중입니다</p>
+          </div>
+        </div>
       ) : null}
       </div>
       <EmployeeHrCardPrint cards={hrCards} />

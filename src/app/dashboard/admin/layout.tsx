@@ -16,7 +16,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex flex-col gap-6 sm:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto sm:flex-row">
       <AdminSubNav />
       <div className="min-w-0 flex-1">{children}</div>
     </div>

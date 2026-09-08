@@ -12,6 +12,7 @@ import type { SessionUser } from "@/lib/types";
 
 interface AppSidebarProps {
   user: SessionUser;
+  rosterSyncedAt?: string | null;
 }
 
 const NAV_ICONS: Record<string, string> = {
@@ -29,7 +30,7 @@ function isNavActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar({ user, rosterSyncedAt }: AppSidebarProps) {
   const pathname = usePathname();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const items = mainNavItems.filter(
@@ -59,7 +60,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3">
-        <p className="px-[18px] pt-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-[#BCC0C8] uppercase">
+        <p className="px-[18px] pt-2 pb-1 text-[11px] font-medium tracking-[0.08em] text-[#BCC0C8] uppercase">
           메뉴
         </p>
         {items.map((item) => {
@@ -68,7 +69,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`relative flex items-center gap-2.5 px-[18px] py-2.5 text-[13px] transition-colors ${
+              className={`relative flex items-center gap-2.5 px-[18px] py-2.5 text-[14px] transition-colors ${
                 isActive
                   ? "bg-[#1E5FD4]/25 font-medium text-white"
                   : "font-normal text-white/65 hover:bg-white/6 hover:text-white"
@@ -80,7 +81,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   aria-hidden
                 />
               ) : null}
-              <span className="w-[18px] text-center text-[15px]">
+              <span className="w-[18px] text-center text-[16px]">
                 {NAV_ICONS[item.href] ?? "•"}
               </span>
               {item.label}
@@ -90,6 +91,13 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </nav>
 
       <div className="border-t border-white/8 px-[18px] py-3.5">
+        {rosterSyncedAt ? (
+          <p className="mb-3 text-[11px] leading-4 text-[#BCC0C8]">
+            사원명부 업데이트
+            <br />
+            <span className="text-white/80">{rosterSyncedAt}</span>
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={() => setShowPasswordModal(true)}

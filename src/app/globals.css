@@ -27,6 +27,12 @@ body {
     display: none !important;
   }
 
+  .dashboard-shell,
+  .print-main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
   .print-main {
     margin-left: 0 !important;
     padding: 0 !important;
