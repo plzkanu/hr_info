@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
 import http from "node:http";
+import net from "node:net";
 import { nextCli } from "./node-paths.mjs";
 
 const host = process.env.HOST ?? "0.0.0.0";
-const port = process.env.PORT ?? "3000";
+const port = Number(process.env.PORT ?? 3000);
 const healthPort = Number(process.env.HEALTH_PORT ?? 1104);
 
 function startHealthSidecar() {
@@ -43,7 +44,6 @@ function startHealthSidecar() {
     console.error("[health]", error);
   });
 
-  // Replit Promote는 127.0.0.1:1104 를 조회합니다. 0.0.0.0 으로 열면 둘 다 받습니다.
   server.listen(healthPort, "0.0.0.0", () => {
     console.log(`[health] 0.0.0.0:${healthPort} ready`);
   });
@@ -59,22 +59,62 @@ function nextEnv() {
   return env;
 }
 
-startHealthSidecar();
+function portAvailable(listenPort, bindHost) {
+  return new Promise((resolve) => {
+    const tester = net.createServer();
+    tester.once("error", () => resolve(false));
+    tester.once("listening", () => {
+      tester.close(() => resolve(true));
+    });
+    tester.listen(listenPort, bindHost);
+  });
+}
 
-const nextBin = nextCli();
-const child = spawn(
-  process.execPath,
-  [nextBin, "start", "-H", host, "-p", String(port)],
-  {
-    stdio: "inherit",
-    env: nextEnv(),
-  },
-);
-
-child.on("exit", (code, signal) => {
-  if (signal) {
-    process.kill(process.pid, signal);
-    return;
+async function waitForPort(listenPort, bindHost, tries = 20) {
+  for (let i = 0; i < tries; i += 1) {
+    if (await portAvailable(listenPort, bindHost)) return true;
+    console.warn(
+      `[start] ${bindHost}:${listenPort} in use, retry ${i + 1}/${tries}`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  process.exit(code ?? 1);
-});
+  return false;
+}
+
+function startNext() {
+  const nextBin = nextCli();
+  const child = spawn(
+    process.execPath,
+    [nextBin, "start", "-H", host, "-p", String(port)],
+    {
+      stdio: "inherit",
+      env: nextEnv(),
+    },
+  );
+
+  child.on("exit", (code, signal) => {
+    if (signal) {
+      process.kill(process.pid, signal);
+      return;
+    }
+    process.exit(code ?? 1);
+  });
+}
+
+if (port === healthPort) {
+  console.log(
+    `[health] Next.js serves health checks on the application port ${port}`,
+  );
+} else {
+  startHealthSidecar();
+}
+
+const free = await waitForPort(port, host);
+if (!free) {
+  console.error(
+    `[start] ${host}:${port} is still in use after retries. Stop the previous process and redeploy.`,
+  );
+  process.exit(1);
+}
+
+startNext();
