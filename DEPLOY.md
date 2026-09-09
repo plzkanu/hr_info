@@ -1,4 +1,4 @@
-wlr# 배포 안내
+# 배포 안내
 
 사원명부 조회 시스템은 GitHub에 올린 뒤 Replit에서 운영 배포합니다.
 
@@ -95,7 +95,7 @@ git fetch origin main && git reset --hard origin/main && npm install && node scr
 ```bash
 git fetch origin main && git reset --hard origin/main
 node scripts/build-prod.mjs
-node node_modules/next/dist/bin/next start -H 0.0.0.0
+node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
 ```
 
 ### 매번 배포할 때 (origin이 이미 있을 때)
@@ -103,7 +103,7 @@ node node_modules/next/dist/bin/next start -H 0.0.0.0
 ```bash
 git fetch origin main && git reset --hard origin/main
 node scripts/build-prod.mjs
-node node_modules/next/dist/bin/next start -H 0.0.0.0
+node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
 ```
 
 `reset --hard`는 Replit에만 있는 로컬 수정이 지워집니다. GitHub `main`과 똑같이 맞출 때 씁니다.
@@ -122,7 +122,7 @@ test -n "$NEXT_PUBLIC_SUPABASE_URL" && echo "NEXT_PUBLIC_SUPABASE_URL=ok" || ech
 test -n "$SUPABASE_SERVICE_ROLE_KEY" && echo "SUPABASE_SERVICE_ROLE_KEY=ok" || echo "SUPABASE_SERVICE_ROLE_KEY=missing"
 ```
 
-개발 확인만 할 때는 `npm run dev -- -H 0.0.0.0 -p ${PORT:-3000}` 을 써도 됩니다. Replit 퍼블리시는 `build` 후 `node node_modules/next/dist/bin/next start -H 0.0.0.0` 을 권장합니다.
+개발 확인만 할 때는 `npm run dev -- -H 0.0.0.0 -p ${PORT:-3000}` 을 써도 됩니다. Replit 퍼블리시는 `build` 후 `node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000` 을 권장합니다.
 
 ### `/api` 경로 주의
 
@@ -134,33 +134,32 @@ Replit 프록시에서 `/hr-api`가 다른 API 서버가 아니라 **이 Next.js
 
 ### 퍼블리시 헬스체크
 
-Replit Publish가 `healthcheck /internal-api` 또는 `healthcheck /` 에서 500·connection refused를 내면, 예전 `api-server`(포트 1104)를 보고 있는 겁니다. 이 앱은 Next.js이며 `artifacts/api-server`가 아닙니다.
+Replit Autoscale의 내부 health/proxy는 **1104** 포트를 사용합니다. Next.js가 같은 포트에 붙으면 `EADDRINUSE`로 프로세스가 죽고, 헬스체크 `Get "http://127.0.0.1:1104/": context deadline exceeded` 로 Promote가 실패합니다.
 
-1. GitHub 최신 `main`을 받은 뒤 `npm run build`까지 다시 합니다.
+앱은 **3000**만 열고, 공개 포트는 **80**으로 매핑합니다. 1104에는 사이드카를 띄우지 않습니다. `$PORT`가 1104로 들어와도 `-p 3000`으로 덮어씁니다.
+
+1. GitHub 최신 `main`을 받은 뒤 빌드합니다.
 2. 실행은 **npm을 호출하지 않습니다.** 게시 환경에서 `spawn npm ENOENT`가 나지 않게 Node로 직접 띄웁니다.
 
 ```bash
 node scripts/build-prod.mjs
-node node_modules/next/dist/bin/next start -H 0.0.0.0
+node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
 ```
 
 `.replit` 배포 설정도 동일합니다. Node 런타임은 **24**입니다. (`nodejs-20`이면 Supabase가 Node >=22를 요구해 실패합니다.)
 
 - modules: `nodejs-24`
 - build: `node scripts/build-prod.mjs`
-- run: `node node_modules/next/dist/bin/next start -H 0.0.0.0`
-
-Autoscale은 보통 `$PORT=1104`로 Next.js를 띄웁니다. 헬스체크는 Next가 같은 포트에서 `/` 와 `/hr-api/health`에 응답하면 됩니다. `start-prod.mjs`의 1104 사이드카는 쓰지 않습니다. 앱 포트와 1104가 겹치면 EADDRINUSE가 납니다.
+- run: `node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000`
+- ports: `localPort = 3000` → `externalPort = 80`
 
 3. Replit **Publish / Deployment** 설정에서
    - Runtime: Node 24
    - Build command: `node scripts/build-prod.mjs` (`npm run build` 아님)
-   - Run command: `node node_modules/next/dist/bin/next start -H 0.0.0.0`
+   - Run command: `node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000`
    - Health check path: `/` 또는 `/hr-api/health`
 
-GitHub `main`을 다시 받으면 `.replit` 값이 대시보드 설정을 덮습니다. Node 24와 위 run 명령이 `.replit`에 있어야 Promote 때 되돌아가지 않습니다.
-
-Promote가 앱 빌드는 통과하고 `Creating Autoscale service`에서 멈추며 런타임 로그가 없으면 앱 오류가 아닙니다. 같은 설정으로 다시 게시하거나, 반복되면 해당 build ID로 Replit Support에 문의합니다. 기존 성공 배포는 그대로 유지됩니다.
+GitHub `main`을 다시 받으면 `.replit` 값이 대시보드 설정을 덮습니다. Node 24, `-p 3000`, 포트 매핑이 `.replit`에 있어야 Promote 때 1104 충돌이 되살아나지 않습니다.
 
 `.replit`의 `[env]`에 `NODE_ENV=production`을 넣지 않습니다. 넣으면 패키지 설치 때 Tailwind 등 빌드 의존성이 빠져 `@tailwindcss/postcss`를 못 찾습니다.
 4. Replit Secrets에 넣을 값은 `AUTH_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 입니다. `SUPABASE_SSL_VERIFY`나 `NODE_TLS_REJECT_UNAUTHORIZED`는 **없어도 됩니다.** 로그에 TLS 경고가 보여도 Secrets에 그 키가 없으면 무시해도 됩니다.
@@ -168,6 +167,7 @@ Promote가 앱 빌드는 통과하고 `Creating Autoscale service`에서 멈추�
 헬스체크가 통과하는 주소:
 
 - `GET /` → 로그인 화면 (200)
+- `GET /internal-api` → `{ "ok": true }`
 - `GET /hr-api/health` → `{ "ok": true }`
 
 ## 4. 배포 후 확인
@@ -200,7 +200,7 @@ Replit Shell에서:
 git remote add origin https://github.com/plzkanu/hr_info.git
 git fetch origin main && git reset --hard origin/main
 node scripts/build-prod.mjs
-node node_modules/next/dist/bin/next start -H 0.0.0.0
+node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
 ```
 
 `origin`이 이미 있으면 `git remote add` 줄은 건너뛰거나, 주소만 고칠 때 `git remote set-url origin https://github.com/plzkanu/hr_info.git` 을 씁니다.
