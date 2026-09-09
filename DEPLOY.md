@@ -95,7 +95,7 @@ git fetch origin main && git reset --hard origin/main && npm install && node scr
 ```bash
 git fetch origin main && git reset --hard origin/main
 node scripts/build-prod.mjs
-node scripts/start-prod.mjs
+node node_modules/next/dist/bin/next start -H 0.0.0.0
 ```
 
 ### 매번 배포할 때 (origin이 이미 있을 때)
@@ -103,7 +103,7 @@ node scripts/start-prod.mjs
 ```bash
 git fetch origin main && git reset --hard origin/main
 node scripts/build-prod.mjs
-node scripts/start-prod.mjs
+node node_modules/next/dist/bin/next start -H 0.0.0.0
 ```
 
 `reset --hard`는 Replit에만 있는 로컬 수정이 지워집니다. GitHub `main`과 똑같이 맞출 때 씁니다.
@@ -122,7 +122,7 @@ test -n "$NEXT_PUBLIC_SUPABASE_URL" && echo "NEXT_PUBLIC_SUPABASE_URL=ok" || ech
 test -n "$SUPABASE_SERVICE_ROLE_KEY" && echo "SUPABASE_SERVICE_ROLE_KEY=ok" || echo "SUPABASE_SERVICE_ROLE_KEY=missing"
 ```
 
-개발 확인만 할 때는 `npm run dev -- -H 0.0.0.0 -p ${PORT:-3000}` 을 써도 됩니다. Replit 퍼블리시는 `build` 후 `start:prod`를 권장합니다.
+개발 확인만 할 때는 `npm run dev -- -H 0.0.0.0 -p ${PORT:-3000}` 을 써도 됩니다. Replit 퍼블리시는 `build` 후 `node node_modules/next/dist/bin/next start -H 0.0.0.0` 을 권장합니다.
 
 ### `/api` 경로 주의
 
@@ -141,28 +141,33 @@ Replit Publish가 `healthcheck /internal-api` 또는 `healthcheck /` 에서 500�
 
 ```bash
 node scripts/build-prod.mjs
-node scripts/start-prod.mjs
+node node_modules/next/dist/bin/next start -H 0.0.0.0
 ```
 
-`.replit` 배포 설정도 동일합니다.
+`.replit` 배포 설정도 동일합니다. Node 런타임은 **24**입니다. (`nodejs-20`이면 Supabase가 Node >=22를 요구해 실패합니다.)
 
+- modules: `nodejs-24`
 - build: `node scripts/build-prod.mjs`
-- run: `node scripts/start-prod.mjs`
+- run: `node node_modules/next/dist/bin/next start -H 0.0.0.0`
 
-이 스크립트는 Next.js를 `$PORT`에 띄우고, Replit 헬스체크용으로 `127.0.0.1:1104`에서 `/`와 `/internal-api`에 200을 줍니다. 사이드카는 Promote/Autoscale에서도 항상 먼저 기동합니다.
+Autoscale은 보통 `$PORT=1104`로 Next.js를 띄웁니다. 헬스체크는 Next가 같은 포트에서 `/` 와 `/hr-api/health`에 응답하면 됩니다. `start-prod.mjs`의 1104 사이드카는 쓰지 않습니다. 앱 포트와 1104가 겹치면 EADDRINUSE가 납니다.
 
 3. Replit **Publish / Deployment** 설정에서
+   - Runtime: Node 24
    - Build command: `node scripts/build-prod.mjs` (`npm run build` 아님)
-   - Run command: `node scripts/start-prod.mjs` (`npm run start:prod` 아님)
-   - Health check path: `/internal-api` 또는 `/`
+   - Run command: `node node_modules/next/dist/bin/next start -H 0.0.0.0`
+   - Health check path: `/` 또는 `/hr-api/health`
 
-`.replit`의 `[env]`에 `NODE_ENV=production`을 넣지 않습니다. 넣으면 패키지 설치 때 Tailwind 등 빌드 의존성이 빠져 `@tailwindcss/postcss`를 못 찾습니다. `NODE_ENV=production`은 `start-prod.mjs`가 Next.js를 켤 때만 적용합니다.
+GitHub `main`을 다시 받으면 `.replit` 값이 대시보드 설정을 덮습니다. Node 24와 위 run 명령이 `.replit`에 있어야 Promote 때 되돌아가지 않습니다.
+
+Promote가 앱 빌드는 통과하고 `Creating Autoscale service`에서 멈추며 런타임 로그가 없으면 앱 오류가 아닙니다. 같은 설정으로 다시 게시하거나, 반복되면 해당 build ID로 Replit Support에 문의합니다. 기존 성공 배포는 그대로 유지됩니다.
+
+`.replit`의 `[env]`에 `NODE_ENV=production`을 넣지 않습니다. 넣으면 패키지 설치 때 Tailwind 등 빌드 의존성이 빠져 `@tailwindcss/postcss`를 못 찾습니다.
 4. Replit Secrets에 넣을 값은 `AUTH_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 입니다. `SUPABASE_SSL_VERIFY`나 `NODE_TLS_REJECT_UNAUTHORIZED`는 **없어도 됩니다.** 로그에 TLS 경고가 보여도 Secrets에 그 키가 없으면 무시해도 됩니다.
 
 헬스체크가 통과하는 주소:
 
 - `GET /` → 로그인 화면 (200)
-- `GET /internal-api` → `{ "ok": true }`
 - `GET /hr-api/health` → `{ "ok": true }`
 
 ## 4. 배포 후 확인
@@ -195,7 +200,7 @@ Replit Shell에서:
 git remote add origin https://github.com/plzkanu/hr_info.git
 git fetch origin main && git reset --hard origin/main
 node scripts/build-prod.mjs
-node scripts/start-prod.mjs
+node node_modules/next/dist/bin/next start -H 0.0.0.0
 ```
 
 `origin`이 이미 있으면 `git remote add` 줄은 건너뛰거나, 주소만 고칠 때 `git remote set-url origin https://github.com/plzkanu/hr_info.git` 을 씁니다.

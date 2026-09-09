@@ -1,10 +1,10 @@
-run = "node scripts/start-prod.mjs"
-modules = ["nodejs-20"]
+run = "node node_modules/next/dist/bin/next start -H 0.0.0.0"
+modules = ["nodejs-24"]
 
 [deployment]
 deploymentTarget = "autoscale"
 build = ["node", "scripts/build-prod.mjs"]
-run = ["node", "scripts/start-prod.mjs"]
+run = ["node", "node_modules/next/dist/bin/next", "start", "-H", "0.0.0.0"]
 
 [env]
 HOST = "0.0.0.0"
