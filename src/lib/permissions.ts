@@ -1,8 +1,9 @@
 export const FEATURE_PERMISSIONS = [
   {
     id: "view_full_resident_id",
-    label: "주민번호 전체보기",
-    description: "사원명부와 엑셀에서 주민등록번호 13자리를 모두 볼 수 있습니다.",
+    label: "주민번호·생년월일·나이·양/음",
+    description:
+      "사원명부에서 주민등록번호, 생년월일, 나이, 양/음을 볼 수 있습니다. 권한이 없으면 해당 항목이 표시되지 않습니다.",
   },
 ] as const;
 
@@ -33,6 +34,12 @@ export function hasPermission(
   id: FeaturePermissionId,
 ): boolean {
   return (permissions ?? []).includes(id);
+}
+
+export function canViewPersonalIdentity(
+  permissions: readonly string[] | undefined,
+): boolean {
+  return hasPermission(permissions, "view_full_resident_id");
 }
 
 export function permissionLabel(id: string): string {

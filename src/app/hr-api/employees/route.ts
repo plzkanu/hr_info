@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/api-auth";
-import { formatResidentId } from "@/lib/format";
-import { hasPermission } from "@/lib/permissions";
+import { applyPersonalIdentityVisibility } from "@/lib/format";
+import { canViewPersonalIdentity } from "@/lib/permissions";
 import {
   getEmployeeFilterOptions,
   searchEmployees,
@@ -52,17 +52,14 @@ export async function GET(request: Request) {
 
     const filters = parseFilters(url);
     const { employees, rosterUnavailable } = await searchEmployees(filters);
-    const revealFullResidentId = hasPermission(
-      sessionOrResponse.permissions,
-      "view_full_resident_id",
-    );
+    const allowed = canViewPersonalIdentity(sessionOrResponse.permissions);
     return NextResponse.json({
-      employees: employees.map((employee) => ({
-        ...employee,
-        residentId: formatResidentId(employee.residentId, revealFullResidentId),
-      })),
+      employees: employees.map((employee) =>
+        applyPersonalIdentityVisibility(employee, allowed),
+      ),
       total: employees.length,
       rosterUnavailable,
+      canViewPersonalIdentity: allowed,
     });
   } catch (error) {
     return NextResponse.json(

@@ -43,6 +43,10 @@ body {
   display: none;
 }
 
+.hr-card-preview-shell .hr-card-print-root {
+  display: block;
+}
+
 body.printing-hr-card .inquiry-screen {
   display: none !important;
 }
@@ -52,8 +56,35 @@ body.printing-hr-card .inquiry-screen {
     background: #fff;
   }
 
+  body.printing-hr-card .hr-card-preview-shell {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  body.printing-hr-card .hr-card-preview-shell > div {
+    max-height: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.printing-hr-card .hr-card-preview-scroll {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
   body.printing-hr-card .hr-card-print-root {
-    display: block;
+    display: block !important;
   }
 
   body.printing-hr-card .print-main h1 {

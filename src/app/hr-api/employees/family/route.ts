@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/api-auth";
 import { getEmployeeFamily } from "@/lib/family-store";
-import { formatResidentId } from "@/lib/format";
-import { hasPermission } from "@/lib/permissions";
+import { applyPersonalIdentityVisibility } from "@/lib/format";
+import { canViewPersonalIdentity } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   const sessionOrResponse = await requireApiSession();
@@ -20,16 +20,13 @@ export async function GET(request: Request) {
       );
     }
 
-    const revealFullResidentId = hasPermission(
-      sessionOrResponse.permissions,
-      "view_full_resident_id",
-    );
+    const allowed = canViewPersonalIdentity(sessionOrResponse.permissions);
     const members = await getEmployeeFamily(empNo, company);
     return NextResponse.json({
-      members: members.map((member) => ({
-        ...member,
-        residentId: formatResidentId(member.residentId, revealFullResidentId),
-      })),
+      members: members.map((member) =>
+        applyPersonalIdentityVisibility(member, allowed),
+      ),
+      canViewPersonalIdentity: allowed,
     });
   } catch (error) {
     return NextResponse.json(

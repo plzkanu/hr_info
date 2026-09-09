@@ -1,11 +1,11 @@
 import { spawn } from "node:child_process";
 import http from "node:http";
-import net from "node:net";
 import { nextCli } from "./node-paths.mjs";
 
 const host = process.env.HOST ?? "0.0.0.0";
 const port = Number(process.env.PORT ?? 3000);
 const healthPort = Number(process.env.HEALTH_PORT ?? 1104);
+const maxStartAttempts = 10;
 
 function startHealthSidecar() {
   const server = http.createServer((req, res) => {
@@ -44,8 +44,9 @@ function startHealthSidecar() {
     console.error("[health]", error);
   });
 
-  server.listen(healthPort, "0.0.0.0", () => {
-    console.log(`[health] 0.0.0.0:${healthPort} ready`);
+  // Replit Promote는 127.0.0.1:1104 만 조회합니다. 앱 포트와 겹치지 않게 loopback만 엽니다.
+  server.listen(healthPort, "127.0.0.1", () => {
+    console.log(`[health] 127.0.0.1:${healthPort} ready`);
   });
 }
 
@@ -54,47 +55,41 @@ function nextEnv() {
     ...process.env,
     NODE_ENV: process.env.NODE_ENV || "production",
     HOST: host,
+    PORT: String(port),
   };
   delete env.NODE_TLS_REJECT_UNAUTHORIZED;
   return env;
 }
 
-function portAvailable(listenPort, bindHost) {
-  return new Promise((resolve) => {
-    const tester = net.createServer();
-    tester.once("error", () => resolve(false));
-    tester.once("listening", () => {
-      tester.close(() => resolve(true));
-    });
-    tester.listen(listenPort, bindHost);
-  });
-}
-
-async function waitForPort(listenPort, bindHost, tries = 20) {
-  for (let i = 0; i < tries; i += 1) {
-    if (await portAvailable(listenPort, bindHost)) return true;
-    console.warn(
-      `[start] ${bindHost}:${listenPort} in use, retry ${i + 1}/${tries}`,
-    );
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  return false;
-}
-
-function startNext() {
+function startNext(attempt = 1) {
   const nextBin = nextCli();
   const child = spawn(
     process.execPath,
     [nextBin, "start", "-H", host, "-p", String(port)],
     {
-      stdio: "inherit",
+      stdio: ["inherit", "pipe", "pipe"],
       env: nextEnv(),
     },
   );
 
+  let addrInUse = false;
+  function forward(chunk, dest) {
+    dest.write(chunk);
+    if (String(chunk).includes("EADDRINUSE")) addrInUse = true;
+  }
+  child.stdout?.on("data", (chunk) => forward(chunk, process.stdout));
+  child.stderr?.on("data", (chunk) => forward(chunk, process.stderr));
+
   child.on("exit", (code, signal) => {
     if (signal) {
       process.kill(process.pid, signal);
+      return;
+    }
+    if ((addrInUse || code !== 0) && addrInUse && attempt < maxStartAttempts) {
+      console.warn(
+        `[start] ${host}:${port} in use, retry ${attempt}/${maxStartAttempts} in 1s`,
+      );
+      setTimeout(() => startNext(attempt + 1), 1000);
       return;
     }
     process.exit(code ?? 1);
@@ -107,14 +102,6 @@ if (port === healthPort) {
   );
 } else {
   startHealthSidecar();
-}
-
-const free = await waitForPort(port, host);
-if (!free) {
-  console.error(
-    `[start] ${host}:${port} is still in use after retries. Stop the previous process and redeploy.`,
-  );
-  process.exit(1);
 }
 
 startNext();

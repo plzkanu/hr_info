@@ -186,7 +186,11 @@ function toQuery(filters: FilterState): string {
   return params.toString();
 }
 
-export function EmployeeInquiry() {
+export function EmployeeInquiry({
+  canViewPersonalIdentity = false,
+}: {
+  canViewPersonalIdentity?: boolean;
+}) {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [draft, setDraft] = useState<FilterState>(emptyFilters);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -202,7 +206,6 @@ export function EmployeeInquiry() {
   const [sorts, setSorts] = useState<SortRule[]>([]);
   const [sortBusy, setSortBusy] = useState(false);
   const [sortTick, setSortTick] = useState(0);
-  const printAfterRender = useRef(false);
   const sortStartedAt = useRef(0);
   const sortDeferTimer = useRef<number | null>(null);
 
@@ -306,15 +309,24 @@ export function EmployeeInquiry() {
   }, [employees]);
 
   const sortedEmployees = useMemo(() => {
-    if (sorts.length === 0) return employees;
+    const activeSorts = canViewPersonalIdentity
+      ? sorts
+      : sorts.filter(
+          (item) =>
+            item.key !== "residentId" &&
+            item.key !== "birthDate" &&
+            item.key !== "calendarType" &&
+            item.key !== "age",
+        );
+    if (activeSorts.length === 0) return employees;
     return [...employees].sort((a, b) => {
-      for (const { key, dir } of sorts) {
+      for (const { key, dir } of activeSorts) {
         const cmp = compareSortValues(sortValue(a, key), sortValue(b, key));
         if (cmp !== 0) return dir === "asc" ? cmp : -cmp;
       }
       return 0;
     });
-  }, [employees, sorts]);
+  }, [canViewPersonalIdentity, employees, sorts]);
 
   function toggleSort(key: SortKey) {
     setSortBusy(true);
@@ -365,30 +377,37 @@ export function EmployeeInquiry() {
   }
 
   function exportExcel() {
-    const rows = sortedEmployees.map((e, index) => ({
-      번호: index + 1,
-      회사: e.companyCode,
-      부서: e.departmentName,
-      직책: e.position,
-      직급: e.jobGrade,
-      사원: e.name,
-      입사일: e.hireDate ?? "",
-      퇴사일: e.resignDate ?? "",
-      이메일: e.email,
-      사번: e.empNo,
-      영문이름: e.englishName,
-      사원구분: e.empCategory,
-      "재직/퇴직구분": e.employmentStatus,
-      주민등록번호: e.residentId,
-      성별: e.gender,
-      생년월일: e.birthDate ?? "",
-      "양/음": e.calendarType,
-      나이: e.age ?? "",
-      고용형태: e.employType,
-      "내/외국인": e.nationalityType,
-      급여처리그룹: e.payrollGroup,
-      비고: e.remarks,
-    }));
+    const rows = sortedEmployees.map((e, index) => {
+      const row: Record<string, string | number> = {
+        번호: index + 1,
+        회사: e.companyCode,
+        부서: e.departmentName,
+        직책: e.position,
+        직급: e.jobGrade,
+        사원: e.name,
+        입사일: e.hireDate ?? "",
+        퇴사일: e.resignDate ?? "",
+        이메일: e.email,
+        사번: e.empNo,
+        영문이름: e.englishName,
+        사원구분: e.empCategory,
+        "재직/퇴직구분": e.employmentStatus,
+      };
+      if (canViewPersonalIdentity) {
+        row.주민등록번호 = e.residentId;
+      }
+      row.성별 = e.gender;
+      if (canViewPersonalIdentity) {
+        row.생년월일 = e.birthDate ?? "";
+        row["양/음"] = e.calendarType;
+        row.나이 = e.age ?? "";
+      }
+      row.고용형태 = e.employType;
+      row["내/외국인"] = e.nationalityType;
+      row.급여처리그룹 = e.payrollGroup;
+      row.비고 = e.remarks;
+      return row;
+    });
     const sheet = XLSX.utils.json_to_sheet(rows);
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, "사원명부");
@@ -427,9 +446,9 @@ export function EmployeeInquiry() {
       if (cards.length === 0) {
         throw new Error("출력할 인사카드 데이터가 없습니다.");
       }
-      printAfterRender.current = true;
       setHrCards(cards);
       setDetail(null);
+      setHrCardBusy(false);
       if (targets.length > HR_CARD_MAX) {
         setError(
           `한 번에 최대 ${HR_CARD_MAX}명까지 출력합니다. 나머지 인원은 다시 선택해 주세요.`,
@@ -442,18 +461,6 @@ export function EmployeeInquiry() {
       setHrCardBusy(false);
     }
   }
-
-  useEffect(() => {
-    if (!printAfterRender.current || hrCards.length === 0) return;
-    printAfterRender.current = false;
-    document.body.classList.add("printing-hr-card");
-    const timer = window.setTimeout(() => {
-      window.print();
-      document.body.classList.remove("printing-hr-card");
-      setHrCardBusy(false);
-    }, 80);
-    return () => window.clearTimeout(timer);
-  }, [hrCards]);
 
   useEffect(() => {
     function onAfterPrint() {
@@ -757,11 +764,11 @@ export function EmployeeInquiry() {
                 <col className="w-[64px]" />
                 <col className="w-[72px]" />
                 <col className="w-[88px]" />
-                <col className="w-[108px]" />
+                {canViewPersonalIdentity ? <col className="w-[108px]" /> : null}
                 <col className="w-[36px]" />
-                <col className="w-[78px]" />
-                <col className="w-[40px]" />
-                <col className="w-[36px]" />
+                {canViewPersonalIdentity ? <col className="w-[78px]" /> : null}
+                {canViewPersonalIdentity ? <col className="w-[40px]" /> : null}
+                {canViewPersonalIdentity ? <col className="w-[36px]" /> : null}
               </colgroup>
               <thead className="sticky top-0 z-10 bg-slate-50 text-[12px] text-slate-500">
                 <tr>
@@ -842,36 +849,44 @@ export function EmployeeInquiry() {
                     sorts={sorts}
                     onToggle={toggleSort}
                   />
-                  <SortableTh
-                    label="주민등록번호"
-                    sortKey="residentId"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
+                  {canViewPersonalIdentity ? (
+                    <SortableTh
+                      label="주민등록번호"
+                      sortKey="residentId"
+                      sorts={sorts}
+                      onToggle={toggleSort}
+                    />
+                  ) : null}
                   <SortableTh
                     label="성별"
                     sortKey="gender"
                     sorts={sorts}
                     onToggle={toggleSort}
                   />
-                  <SortableTh
-                    label="생년월일"
-                    sortKey="birthDate"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="양/음"
-                    sortKey="calendarType"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="나이"
-                    sortKey="age"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
+                  {canViewPersonalIdentity ? (
+                    <SortableTh
+                      label="생년월일"
+                      sortKey="birthDate"
+                      sorts={sorts}
+                      onToggle={toggleSort}
+                    />
+                  ) : null}
+                  {canViewPersonalIdentity ? (
+                    <SortableTh
+                      label="양/음"
+                      sortKey="calendarType"
+                      sorts={sorts}
+                      onToggle={toggleSort}
+                    />
+                  ) : null}
+                  {canViewPersonalIdentity ? (
+                    <SortableTh
+                      label="나이"
+                      sortKey="age"
+                      sorts={sorts}
+                      onToggle={toggleSort}
+                    />
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -925,13 +940,21 @@ export function EmployeeInquiry() {
                         {emp.employmentStatus}
                       </span>
                     </td>
-                    <td className="truncate px-1.5 py-1.5 font-mono text-[12px]">
-                      {emp.residentId}
-                    </td>
+                    {canViewPersonalIdentity ? (
+                      <td className="truncate px-1.5 py-1.5 font-mono text-[12px]">
+                        {emp.residentId}
+                      </td>
+                    ) : null}
                     <td className="truncate px-1.5 py-1.5">{emp.gender}</td>
-                    <td className="truncate px-1.5 py-1.5">{emp.birthDate}</td>
-                    <td className="truncate px-1.5 py-1.5">{emp.calendarType}</td>
-                    <td className="truncate px-1.5 py-1.5">{emp.age ?? ""}</td>
+                    {canViewPersonalIdentity ? (
+                      <td className="truncate px-1.5 py-1.5">{emp.birthDate}</td>
+                    ) : null}
+                    {canViewPersonalIdentity ? (
+                      <td className="truncate px-1.5 py-1.5">{emp.calendarType}</td>
+                    ) : null}
+                    {canViewPersonalIdentity ? (
+                      <td className="truncate px-1.5 py-1.5">{emp.age ?? ""}</td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -943,6 +966,7 @@ export function EmployeeInquiry() {
       {detail ? (
         <EmployeeDetailModal
           employee={detail}
+          canViewPersonalIdentity={canViewPersonalIdentity}
           onClose={() => setDetail(null)}
           onPrintHrCard={() => void printHrCards([detail])}
           hrCardBusy={hrCardBusy}
@@ -956,7 +980,11 @@ export function EmployeeInquiry() {
         </div>
       ) : null}
       </div>
-      <EmployeeHrCardPrint cards={hrCards} />
+      <EmployeeHrCardPrint
+        cards={hrCards}
+        canViewPersonalIdentity={canViewPersonalIdentity}
+        onClose={() => setHrCards([])}
+      />
     </div>
   );
 }

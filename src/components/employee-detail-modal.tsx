@@ -28,12 +28,20 @@ type TabId = (typeof TABS)[number]["id"];
 
 interface EmployeeDetailModalProps {
   employee: Employee;
+  canViewPersonalIdentity?: boolean;
   onClose: () => void;
   onPrintHrCard?: () => void;
   hrCardBusy?: boolean;
 }
 
-const PROFILE_SECTIONS: { title: string; fields: { label: string; value: (e: Employee) => string }[] }[] = [
+const PROFILE_SECTIONS: {
+  title: string;
+  fields: {
+    label: string;
+    value: (e: Employee) => string;
+    sensitive?: boolean;
+  }[];
+}[] = [
   {
     title: "기본정보",
     fields: [
@@ -41,10 +49,15 @@ const PROFILE_SECTIONS: { title: string; fields: { label: string; value: (e: Emp
       { label: "성명", value: (e) => e.name },
       { label: "사번", value: (e) => e.empNo },
       { label: "영문이름", value: (e) => e.englishName },
-      { label: "주민등록번호", value: (e) => e.residentId },
+      { label: "주민등록번호", value: (e) => e.residentId, sensitive: true },
       { label: "성별", value: (e) => e.gender },
-      { label: "생년월일", value: (e) => e.birthDate ?? "" },
-      { label: "나이", value: (e) => (e.age != null ? String(e.age) : "") },
+      { label: "생년월일", value: (e) => e.birthDate ?? "", sensitive: true },
+      { label: "양/음", value: (e) => e.calendarType, sensitive: true },
+      {
+        label: "나이",
+        value: (e) => (e.age != null ? String(e.age) : ""),
+        sensitive: true,
+      },
       { label: "내/외국인", value: (e) => e.nationalityType },
     ],
   },
@@ -76,6 +89,7 @@ const PROFILE_SECTIONS: { title: string; fields: { label: string; value: (e: Emp
 
 export function EmployeeDetailModal({
   employee,
+  canViewPersonalIdentity = false,
   onClose,
   onPrintHrCard,
   hrCardBusy = false,
@@ -202,7 +216,12 @@ export function EmployeeDetailModal({
                     {section.title}
                   </h3>
                   <div className="grid grid-cols-3">
-                    {section.fields.map((field) => (
+                    {section.fields
+                      .filter(
+                        (field) =>
+                          canViewPersonalIdentity || !field.sensitive,
+                      )
+                      .map((field) => (
                       <div
                         key={field.label}
                         className="border-b border-slate-50 px-4 py-3 last:border-b-0"
@@ -220,7 +239,10 @@ export function EmployeeDetailModal({
           ) : tab === "appointment" ? (
             <EmployeeAppointmentsPanel employee={employee} />
           ) : tab === "family" ? (
-            <EmployeeFamilyPanel employee={employee} />
+            <EmployeeFamilyPanel
+              employee={employee}
+              canViewPersonalIdentity={canViewPersonalIdentity}
+            />
           ) : tab === "education" ? (
             <EmployeeEducationPanel employee={employee} />
           ) : tab === "certificate" ? (

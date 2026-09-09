@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect } from "react";
 import { formatAddress } from "@/lib/format";
 import type { EmployeeHrCard } from "@/lib/types";
 
@@ -31,11 +34,74 @@ function EmptyRow({ cols }: { cols: number }) {
   );
 }
 
-export function EmployeeHrCardPrint({ cards }: { cards: EmployeeHrCard[] }) {
+export function EmployeeHrCardPrint({
+  cards,
+  canViewPersonalIdentity = false,
+  onClose,
+}: {
+  cards: EmployeeHrCard[];
+  canViewPersonalIdentity?: boolean;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (cards.length === 0) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    function onAfterPrint() {
+      document.body.classList.remove("printing-hr-card");
+    }
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("afterprint", onAfterPrint);
+      document.body.classList.remove("printing-hr-card");
+    };
+  }, [cards.length, onClose]);
+
   if (cards.length === 0) return null;
 
+  function handlePrint() {
+    document.body.classList.add("printing-hr-card");
+    window.setTimeout(() => {
+      window.print();
+    }, 80);
+  }
+
   return (
-    <div className="hr-card-print-root">
+    <div className="hr-card-preview-shell fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="hr-card-preview-title"
+        className="flex max-h-[calc(100vh-2rem)] w-full max-w-[900px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_80px_rgba(15,38,69,0.28)]"
+      >
+        <header className="no-print flex shrink-0 items-center gap-2 border-b border-slate-200 px-5 py-3">
+          <h2
+            id="hr-card-preview-title"
+            className="min-w-0 flex-1 text-sm font-semibold text-[#004b87]"
+          >
+            인사카드
+            {cards.length > 1 ? ` (${cards.length}명)` : ""}
+          </h2>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="rounded-lg bg-[#004b87] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#003a6b]"
+          >
+            인쇄
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+          >
+            닫기
+          </button>
+        </header>
+        <div className="hr-card-preview-scroll min-h-0 flex-1 overflow-auto bg-slate-100 p-4">
+          <div className="hr-card-print-root">
       {cards.map((card) => {
         const e = card.employee;
         const address = formatAddress(e.addressZip, e.address);
@@ -73,8 +139,8 @@ export function EmployeeHrCardPrint({ cards }: { cards: EmployeeHrCard[] }) {
                 <tr>
                   <th>(영문)</th>
                   <td>{e.englishName}</td>
-                  <th>주민번호</th>
-                  <td>{e.residentId}</td>
+                  <th>{canViewPersonalIdentity ? "주민번호" : ""}</th>
+                  <td>{canViewPersonalIdentity ? e.residentId : ""}</td>
                 </tr>
                 <tr>
                   <th colSpan={2}>부서</th>
@@ -101,8 +167,8 @@ export function EmployeeHrCardPrint({ cards }: { cards: EmployeeHrCard[] }) {
             <table className="hr-card-table">
               <tbody>
                 <tr>
-                  <th>생년월일</th>
-                  <td>{v(e.birthDate)}</td>
+                  <th>{canViewPersonalIdentity ? "생년월일" : ""}</th>
+                  <td>{canViewPersonalIdentity ? v(e.birthDate) : ""}</td>
                   <th>성별</th>
                   <td>{e.gender}</td>
                   <th>종교</th>
@@ -215,20 +281,22 @@ export function EmployeeHrCardPrint({ cards }: { cards: EmployeeHrCard[] }) {
                 <tr>
                   <th>이름</th>
                   <th>관계</th>
-                  <th>생년월일</th>
+                  {canViewPersonalIdentity ? <th>생년월일</th> : null}
                   <th>학력</th>
                   <th>직업</th>
                 </tr>
               </thead>
               <tbody>
                 {card.family.length === 0 ? (
-                  <EmptyRow cols={5} />
+                  <EmptyRow cols={canViewPersonalIdentity ? 5 : 4} />
                 ) : (
                   card.family.map((row) => (
                     <tr key={row.key}>
                       <td>{row.name}</td>
                       <td>{row.relationName}</td>
-                      <td className="nowrap">{v(row.birthDate)}</td>
+                      {canViewPersonalIdentity ? (
+                        <td className="nowrap">{v(row.birthDate)}</td>
+                      ) : null}
                       <td>{row.educationName}</td>
                       <td>{row.occupation}</td>
                     </tr>
@@ -355,6 +423,9 @@ export function EmployeeHrCardPrint({ cards }: { cards: EmployeeHrCard[] }) {
           </article>
         );
       })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

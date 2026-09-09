@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/api-auth";
-import { formatResidentId } from "@/lib/format";
+import { applyPersonalIdentityVisibility } from "@/lib/format";
 import { HR_CARD_MAX } from "@/lib/hr-card";
 import { getEmployeeHrCards } from "@/lib/hr-card-store";
-import { hasPermission } from "@/lib/permissions";
+import { canViewPersonalIdentity } from "@/lib/permissions";
 
 export async function POST(request: Request) {
   const sessionOrResponse = await requireApiSession();
@@ -27,21 +27,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const revealFullResidentId = hasPermission(
-      sessionOrResponse.permissions,
-      "view_full_resident_id",
-    );
+    const allowed = canViewPersonalIdentity(sessionOrResponse.permissions);
     const cards = await getEmployeeHrCards(keys);
     return NextResponse.json({
       cards: cards.map((card) => ({
         ...card,
-        employee: {
-          ...card.employee,
-          residentId: formatResidentId(
-            card.employee.residentId,
-            revealFullResidentId,
-          ),
-        },
+        employee: applyPersonalIdentityVisibility(card.employee, allowed),
+        family: card.family.map((member) =>
+          applyPersonalIdentityVisibility(member, allowed),
+        ),
       })),
       truncated: keys.length > HR_CARD_MAX,
       max: HR_CARD_MAX,

@@ -71,17 +71,8 @@ export function calcAge(
   return age < 0 ? null : age;
 }
 
-/** 주민등록번호 마스킹: 13자리 전부 숨김 */
-export function maskResidentId(value: string): string {
-  if (!(value ?? "").trim()) return "";
-  return "******-*******";
-}
-
-export function formatResidentId(value: string, revealFull: boolean): string {
-  if (!revealFull) {
-    return maskResidentId(value);
-  }
-  const digits = value.replace(/[^0-9]/g, "");
+export function formatResidentId(value: string): string {
+  const digits = (value ?? "").replace(/[^0-9]/g, "");
   if (digits.length >= 13) {
     return `${digits.slice(0, 6)}-${digits.slice(6, 13)}`;
   }
@@ -89,6 +80,35 @@ export function formatResidentId(value: string, revealFull: boolean): string {
     return `${digits.slice(0, 6)}-${digits.slice(6)}`;
   }
   return digits || value;
+}
+
+type PersonalIdentityFields = {
+  residentId?: string;
+  birthDate?: string | null;
+  age?: number | null;
+  calendarType?: string;
+  birthTypeName?: string;
+};
+
+/** 권한이 없으면 주민번호·생년월일·나이·양/음을 비웁니다. 마스킹하지 않습니다. */
+export function applyPersonalIdentityVisibility<T extends PersonalIdentityFields>(
+  record: T,
+  allowed: boolean,
+): T {
+  if (allowed) {
+    return {
+      ...record,
+      residentId: formatResidentId(record.residentId ?? ""),
+    };
+  }
+  return {
+    ...record,
+    residentId: "",
+    ...("birthDate" in record ? { birthDate: null } : {}),
+    ...("age" in record ? { age: null } : {}),
+    ...("calendarType" in record ? { calendarType: "" } : {}),
+    ...("birthTypeName" in record ? { birthTypeName: "" } : {}),
+  };
 }
 
 export function employmentStatusAsOf(

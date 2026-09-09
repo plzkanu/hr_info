@@ -6,13 +6,17 @@ import { hrApi } from "@/lib/hr-api";
 
 interface EmployeeFamilyPanelProps {
   employee: Employee;
+  canViewPersonalIdentity?: boolean;
 }
 
 function yn(value: boolean) {
   return value ? "여" : "부";
 }
 
-export function EmployeeFamilyPanel({ employee }: EmployeeFamilyPanelProps) {
+export function EmployeeFamilyPanel({
+  employee,
+  canViewPersonalIdentity = false,
+}: EmployeeFamilyPanelProps) {
   const [rows, setRows] = useState<EmployeeFamilyMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -90,8 +94,12 @@ export function EmployeeFamilyPanel({ employee }: EmployeeFamilyPanelProps) {
             <tr>
               <th className="px-3 py-2.5">관계</th>
               <th className="px-3 py-2.5">성명</th>
-              <th className="px-3 py-2.5">생년월일</th>
-              <th className="px-3 py-2.5">주민등록번호</th>
+              {canViewPersonalIdentity ? (
+                <th className="px-3 py-2.5">생년월일</th>
+              ) : null}
+              {canViewPersonalIdentity ? (
+                <th className="px-3 py-2.5">주민등록번호</th>
+              ) : null}
               <th className="px-3 py-2.5">연락처</th>
               <th className="px-3 py-2.5">학력</th>
               <th className="px-3 py-2.5">직업</th>
@@ -109,17 +117,21 @@ export function EmployeeFamilyPanel({ employee }: EmployeeFamilyPanelProps) {
                 <td className="whitespace-nowrap px-3 py-2.5 text-slate-800">
                   {row.name || "-"}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
-                  {row.birthDate || "-"}
-                  {row.birthTypeName ? (
-                    <span className="ml-1 text-[11px] text-slate-400">
-                      {row.birthTypeName}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-slate-700">
-                  {row.residentId || "-"}
-                </td>
+                {canViewPersonalIdentity ? (
+                  <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
+                    {row.birthDate || "-"}
+                    {row.birthTypeName ? (
+                      <span className="ml-1 text-[11px] text-slate-400">
+                        {row.birthTypeName}
+                      </span>
+                    ) : null}
+                  </td>
+                ) : null}
+                {canViewPersonalIdentity ? (
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-slate-700">
+                    {row.residentId || "-"}
+                  </td>
+                ) : null}
                 <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
                   {row.phone || "-"}
                 </td>
