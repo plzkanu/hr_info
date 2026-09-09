@@ -1,15 +1,14 @@
-run = "node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000"
+run = "node scripts/start-autoscale.mjs"
 modules = ["nodejs-24"]
 
 [deployment]
 deploymentTarget = "autoscale"
 build = ["node", "scripts/build-prod.mjs"]
-run = ["node", "node_modules/next/dist/bin/next", "start", "-H", "0.0.0.0", "-p", "3000"]
+run = ["node", "scripts/start-autoscale.mjs"]
 
 [env]
 HOST = "0.0.0.0"
-PORT = "3000"
 
 [[ports]]
-localPort = 3000
+localPort = 1104
 externalPort = 80
