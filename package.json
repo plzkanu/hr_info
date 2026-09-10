@@ -10,7 +10,7 @@
     "build": "node scripts/next-build.mjs",
     "build:prod": "node scripts/build-prod.mjs",
     "start": "next start --hostname 0.0.0.0 -p 3000",
-    "start:prod": "node scripts/start-autoscale.mjs",
+    "start:prod": "node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000",
     "lint": "eslint"
   },
   "dependencies": {
