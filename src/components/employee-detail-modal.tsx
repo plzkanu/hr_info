@@ -10,6 +10,7 @@ import {
   EmployeeLicensesPanel,
   EmployeeRewardPenaltyPanel,
 } from "@/components/employee-history-panels";
+import { useBackTrap } from "@/components/navigation-guard";
 import type { Employee } from "@/lib/types";
 
 const TABS = [
@@ -94,6 +95,7 @@ export function EmployeeDetailModal({
   onPrintHrCard,
   hrCardBusy = false,
 }: EmployeeDetailModalProps) {
+  useBackTrap(true, onClose);
   const [tab, setTab] = useState<TabId>("profile");
   const initial = employee.name.trim().charAt(0) || employee.empNo.charAt(0);
   const isActive = employee.employmentStatus === "재직자";
