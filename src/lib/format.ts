@@ -88,9 +88,14 @@ type PersonalIdentityFields = {
   age?: number | null;
   calendarType?: string;
   birthTypeName?: string;
+  educationName?: string;
+  lastSchoolName?: string;
+  lastEducationName?: string;
+  lastMajorName?: string;
+  lastMajorFieldName?: string;
 };
 
-/** 권한이 없으면 주민번호·생년월일·나이·양/음을 비웁니다. 마스킹하지 않습니다. */
+/** 권한이 없으면 주민번호·생년월일·나이·양/음·학력을 비웁니다. 마스킹하지 않습니다. */
 export function applyPersonalIdentityVisibility<T extends PersonalIdentityFields>(
   record: T,
   allowed: boolean,
@@ -108,6 +113,11 @@ export function applyPersonalIdentityVisibility<T extends PersonalIdentityFields
     ...("age" in record ? { age: null } : {}),
     ...("calendarType" in record ? { calendarType: "" } : {}),
     ...("birthTypeName" in record ? { birthTypeName: "" } : {}),
+    ...("educationName" in record ? { educationName: "" } : {}),
+    ...("lastSchoolName" in record ? { lastSchoolName: "" } : {}),
+    ...("lastEducationName" in record ? { lastEducationName: "" } : {}),
+    ...("lastMajorName" in record ? { lastMajorName: "" } : {}),
+    ...("lastMajorFieldName" in record ? { lastMajorFieldName: "" } : {}),
   };
 }
 

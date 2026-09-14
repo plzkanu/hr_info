@@ -40,7 +40,7 @@ Supabase SQL Editor에서 `supabase/apply-all-migrations.sql`을 한 번 실행�
 ```bash
 git add -A
 git status
-git commit -m "배포수정"
+git commit -m "뒤로가기 수정"
 git push origin main
 ```
 

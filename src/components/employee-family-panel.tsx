@@ -101,7 +101,9 @@ export function EmployeeFamilyPanel({
                 <th className="px-3 py-2.5">주민등록번호</th>
               ) : null}
               <th className="px-3 py-2.5">연락처</th>
-              <th className="px-3 py-2.5">학력</th>
+              {canViewPersonalIdentity ? (
+                <th className="px-3 py-2.5">학력</th>
+              ) : null}
               <th className="px-3 py-2.5">직업</th>
               <th className="px-3 py-2.5">동거</th>
               <th className="px-3 py-2.5">부양</th>
@@ -135,9 +137,11 @@ export function EmployeeFamilyPanel({
                 <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
                   {row.phone || "-"}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
-                  {row.educationName || "-"}
-                </td>
+                {canViewPersonalIdentity ? (
+                  <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
+                    {row.educationName || "-"}
+                  </td>
+                ) : null}
                 <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
                   {row.occupation || "-"}
                 </td>

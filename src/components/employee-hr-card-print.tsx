@@ -256,6 +256,8 @@ export function EmployeeHrCardPrint({
               </tbody>
             </table>
 
+            {canViewPersonalIdentity ? (
+              <>
             <h2 className="hr-card-heading">학력사항</h2>
             <table className="hr-card-table">
               <thead>
@@ -285,6 +287,8 @@ export function EmployeeHrCardPrint({
                 )}
               </tbody>
             </table>
+              </>
+            ) : null}
 
             <h2 className="hr-card-heading">가족사항</h2>
             <table className="hr-card-table">
@@ -293,13 +297,13 @@ export function EmployeeHrCardPrint({
                   <th>이름</th>
                   <th>관계</th>
                   {canViewPersonalIdentity ? <th>생년월일</th> : null}
-                  <th>학력</th>
+                  {canViewPersonalIdentity ? <th>학력</th> : null}
                   <th>직업</th>
                 </tr>
               </thead>
               <tbody>
                 {card.family.length === 0 ? (
-                  <EmptyRow cols={canViewPersonalIdentity ? 5 : 4} />
+                  <EmptyRow cols={canViewPersonalIdentity ? 5 : 3} />
                 ) : (
                   card.family.map((row) => (
                     <tr key={row.key}>
@@ -308,7 +312,9 @@ export function EmployeeHrCardPrint({
                       {canViewPersonalIdentity ? (
                         <td className="nowrap">{v(row.birthDate)}</td>
                       ) : null}
-                      <td>{row.educationName}</td>
+                      {canViewPersonalIdentity ? (
+                        <td>{row.educationName}</td>
+                      ) : null}
                       <td>{row.occupation}</td>
                     </tr>
                   ))

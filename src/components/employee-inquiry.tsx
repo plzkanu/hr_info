@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import * as XLSX from "xlsx";
 import { EmployeeDetailModal } from "@/components/employee-detail-modal";
 import { EmployeeHrCardPrint } from "@/components/employee-hr-card-print";
+import { ExcelColumnTh, type SortDir, type SortRule } from "@/components/excel-column-menu";
 import { todayIsoDate } from "@/lib/format";
 import { COMPANY_CODES, parseCompanyFilter, rosterTableFor, type CompanyFilter } from "@/lib/companies";
 import { hrApi } from "@/lib/hr-api";
@@ -37,17 +38,30 @@ type SortKey =
   | "calendarType"
   | "age";
 
-type SortDir = "asc" | "desc";
-
-interface SortRule {
-  key: SortKey;
-  dir: SortDir;
+function displayValue(emp: Employee, key: SortKey): string {
+  const value = emp[key];
+  if (value == null || value === "") return "";
+  return String(value);
 }
 
 function sortValue(emp: Employee, key: SortKey): string | number {
   const value = emp[key];
   if (value == null) return "";
   return value;
+}
+
+function rowPassesColumnFilters(
+  emp: Employee,
+  columnFilters: Partial<Record<SortKey, Set<string>>>,
+  except?: SortKey,
+): boolean {
+  for (const key of Object.keys(columnFilters) as SortKey[]) {
+    if (key === except) continue;
+    const allowed = columnFilters[key];
+    if (!allowed) continue;
+    if (!allowed.has(displayValue(emp, key))) return false;
+  }
+  return true;
 }
 
 function compareSortValues(a: string | number, b: string | number): number {
@@ -61,53 +75,7 @@ function compareSortValues(a: string | number, b: string | number): number {
   });
 }
 
-function nextSorts(prev: SortRule[], key: SortKey): SortRule[] {
-  const index = prev.findIndex((rule) => rule.key === key);
-  if (index < 0) return [...prev, { key, dir: "asc" }];
-  if (prev[index].dir === "asc") {
-    return prev.map((rule, i) => (i === index ? { ...rule, dir: "desc" } : rule));
-  }
-  return prev.filter((_, i) => i !== index);
-}
-
 const SORT_POPUP_MIN_MS = 2000;
-
-function SortableTh({
-  label,
-  sortKey,
-  sorts,
-  onToggle,
-}: {
-  label: string;
-  sortKey: SortKey;
-  sorts: SortRule[];
-  onToggle: (key: SortKey) => void;
-}) {
-  const index = sorts.findIndex((rule) => rule.key === sortKey);
-  const rule = index >= 0 ? sorts[index] : null;
-  return (
-    <th
-      className="select-none whitespace-nowrap px-1.5 py-2 font-medium"
-      onDoubleClick={(event) => {
-        event.preventDefault();
-        onToggle(sortKey);
-      }}
-      title="더블클릭: 오름차순 → 내림차순 → 정렬 해제"
-    >
-      <span className="inline-flex cursor-pointer items-center gap-0.5 hover:text-slate-700">
-        {label}
-        {rule ? (
-          <span className="text-[#004b87]">
-            {rule.dir === "asc" ? "▲" : "▼"}
-            {sorts.length > 1 ? (
-              <span className="ml-px text-[9px]">{index + 1}</span>
-            ) : null}
-          </span>
-        ) : null}
-      </span>
-    </th>
-  );
-}
 
 interface FilterState {
   company: CompanyFilter;
@@ -203,7 +171,11 @@ export function EmployeeInquiry({
   const [rosterUnavailable, setRosterUnavailable] = useState(false);
   const [hrCards, setHrCards] = useState<EmployeeHrCard[]>([]);
   const [hrCardBusy, setHrCardBusy] = useState(false);
-  const [sorts, setSorts] = useState<SortRule[]>([]);
+  const [sorts, setSorts] = useState<SortRule<SortKey>[]>([]);
+  const [columnFilters, setColumnFilters] = useState<
+    Partial<Record<SortKey, Set<string>>>
+  >({});
+  const [openMenu, setOpenMenu] = useState<SortKey | null>(null);
   const [sortBusy, setSortBusy] = useState(false);
   const [sortTick, setSortTick] = useState(0);
   const sortStartedAt = useRef(0);
@@ -242,6 +214,9 @@ export function EmployeeInquiry({
       setEmployees(data.employees ?? []);
       setRosterUnavailable(data.rosterUnavailable === true);
       setSelectedIds(new Set());
+      setColumnFilters({});
+      setSorts([]);
+      setOpenMenu(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "조회에 실패했습니다.");
     } finally {
@@ -287,28 +262,15 @@ export function EmployeeInquiry({
     void loadMeta(next.company);
     void loadEmployees(next);
     setSorts([]);
+    setColumnFilters({});
+    setOpenMenu(null);
     setSortBusy(false);
   }
 
-  const allSelected = useMemo(
-    () => employees.length > 0 && employees.every((e) => selectedIds.has(e.id)),
-    [employees, selectedIds],
-  );
-
-  const companyCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const emp of employees) {
-      if (!emp.companyCode) continue;
-      counts.set(emp.companyCode, (counts.get(emp.companyCode) ?? 0) + 1);
-    }
-    const codes = [...new Set(["IND", "ENS", ...counts.keys()])];
-    return codes.map((code) => ({
-      code,
-      count: counts.get(code) ?? 0,
-    }));
-  }, [employees]);
-
-  const sortedEmployees = useMemo(() => {
+  const displayedEmployees = useMemo(() => {
+    const filtered = employees.filter((emp) =>
+      rowPassesColumnFilters(emp, columnFilters),
+    );
     const activeSorts = canViewPersonalIdentity
       ? sorts
       : sorts.filter(
@@ -318,17 +280,66 @@ export function EmployeeInquiry({
             item.key !== "calendarType" &&
             item.key !== "age",
         );
-    if (activeSorts.length === 0) return employees;
-    return [...employees].sort((a, b) => {
+    if (activeSorts.length === 0) return filtered;
+    return [...filtered].sort((a, b) => {
       for (const { key, dir } of activeSorts) {
         const cmp = compareSortValues(sortValue(a, key), sortValue(b, key));
         if (cmp !== 0) return dir === "asc" ? cmp : -cmp;
       }
       return 0;
     });
-  }, [canViewPersonalIdentity, employees, sorts]);
+  }, [canViewPersonalIdentity, columnFilters, employees, sorts]);
 
-  function toggleSort(key: SortKey) {
+  const allSelected = useMemo(
+    () =>
+      displayedEmployees.length > 0 &&
+      displayedEmployees.every((e) => selectedIds.has(e.id)),
+    [displayedEmployees, selectedIds],
+  );
+
+  const companyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const emp of displayedEmployees) {
+      if (!emp.companyCode) continue;
+      counts.set(emp.companyCode, (counts.get(emp.companyCode) ?? 0) + 1);
+    }
+    const codes = [...new Set(["IND", "ENS", ...counts.keys()])];
+    return codes.map((code) => ({
+      code,
+      count: counts.get(code) ?? 0,
+    }));
+  }, [displayedEmployees]);
+
+  function optionValuesFor(key: SortKey): string[] {
+    const seen = new Set<string>();
+    for (const emp of employees) {
+      if (!rowPassesColumnFilters(emp, columnFilters, key)) continue;
+      seen.add(displayValue(emp, key));
+    }
+    return [...seen].sort((a, b) =>
+      compareSortValues(a, b),
+    );
+  }
+
+  function toggleMenu(key: SortKey) {
+    setOpenMenu((prev) => (prev === key ? null : key));
+  }
+
+  function applyColumnFilter(key: SortKey, selected: Set<string> | null) {
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      if (selected == null) delete next[key];
+      else next[key] = selected;
+      return next;
+    });
+    setOpenMenu(null);
+  }
+
+  function clearColumnFilter(key: SortKey) {
+    applyColumnFilter(key, null);
+  }
+
+  function applySort(key: SortKey, dir: SortDir | "clear") {
     setSortBusy(true);
     sortStartedAt.current = Date.now();
     if (sortDeferTimer.current != null) {
@@ -336,8 +347,12 @@ export function EmployeeInquiry({
     }
     sortDeferTimer.current = window.setTimeout(() => {
       sortDeferTimer.current = null;
-      setSorts((prev) => nextSorts(prev, key));
+      setSorts((prev) => {
+        if (dir === "clear") return prev.filter((rule) => rule.key !== key);
+        return [{ key, dir }];
+      });
       setSortTick((n) => n + 1);
+      setOpenMenu(null);
     }, 50);
   }
 
@@ -364,7 +379,7 @@ export function EmployeeInquiry({
       setSelectedIds(new Set());
       return;
     }
-    setSelectedIds(new Set(employees.map((e) => e.id)));
+    setSelectedIds(new Set(displayedEmployees.map((e) => e.id)));
   }
 
   function toggleOne(id: string) {
@@ -377,7 +392,7 @@ export function EmployeeInquiry({
   }
 
   function exportExcel() {
-    const rows = sortedEmployees.map((e, index) => {
+    const rows = displayedEmployees.map((e, index) => {
       const row: Record<string, string | number> = {
         번호: index + 1,
         회사: e.companyCode,
@@ -482,6 +497,23 @@ export function EmployeeInquiry({
   const companyCodes =
     options?.companies?.length ? options.companies : [...COMPANY_CODES];
 
+  function columnHeader(label: string, key: SortKey) {
+    return (
+      <ExcelColumnTh
+        label={label}
+        columnKey={key}
+        optionValues={optionValuesFor(key)}
+        selectedValues={columnFilters[key] ?? null}
+        sorts={sorts}
+        open={openMenu === key}
+        onToggleOpen={toggleMenu}
+        onSort={applySort}
+        onApplyFilter={applyColumnFilter}
+        onClearFilter={clearColumnFilter}
+      />
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col print:h-auto print:overflow-visible">
       <div className="inquiry-screen flex min-h-0 flex-1 flex-col gap-4 print:h-auto print:overflow-visible">
@@ -496,7 +528,7 @@ export function EmployeeInquiry({
         <button
           type="button"
           onClick={exportExcel}
-          disabled={employees.length === 0}
+          disabled={displayedEmployees.length === 0}
           className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
         >
           엑셀
@@ -511,10 +543,12 @@ export function EmployeeInquiry({
         <button
           type="button"
           onClick={() => {
-            const selected = employees.filter((emp) => selectedIds.has(emp.id));
+            const selected = displayedEmployees.filter((emp) =>
+              selectedIds.has(emp.id),
+            );
             void printHrCards(selected);
           }}
-          disabled={hrCardBusy || employees.length === 0}
+          disabled={hrCardBusy || displayedEmployees.length === 0}
           className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
         >
           {hrCardBusy ? "준비 중..." : "인사카드"}
@@ -529,9 +563,15 @@ export function EmployeeInquiry({
         <p className="ml-auto text-sm text-slate-500">
           총{" "}
           <span className="font-semibold text-slate-700">
-            {employees.length.toLocaleString("ko-KR")}
+            {displayedEmployees.length.toLocaleString("ko-KR")}
           </span>
           명
+          {Object.keys(columnFilters).length > 0 ? (
+            <span>
+              {" "}
+              (전체 {employees.length.toLocaleString("ko-KR")}명)
+            </span>
+          ) : null}
           {companyCounts.length > 0 ? (
             <>
               {" "}
@@ -770,7 +810,7 @@ export function EmployeeInquiry({
                 {canViewPersonalIdentity ? <col className="w-[40px]" /> : null}
                 {canViewPersonalIdentity ? <col className="w-[36px]" /> : null}
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-slate-50 text-[12px] text-slate-500">
+              <thead className="sticky top-0 z-20 bg-slate-50 text-[12px] text-slate-500">
                 <tr>
                   <th className="whitespace-nowrap px-1.5 py-2 font-medium">
                     No
@@ -783,114 +823,42 @@ export function EmployeeInquiry({
                       aria-label="전체 선택"
                     />
                   </th>
-                  <SortableTh
-                    label="회사"
-                    sortKey="companyCode"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="부서"
-                    sortKey="departmentName"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="직책"
-                    sortKey="position"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="직급"
-                    sortKey="jobGrade"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="사원"
-                    sortKey="name"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="입사일"
-                    sortKey="hireDate"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="퇴사일"
-                    sortKey="resignDate"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="이메일"
-                    sortKey="email"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="사번"
-                    sortKey="empNo"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="사원구분"
-                    sortKey="empCategory"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  <SortableTh
-                    label="재직/퇴직구분"
-                    sortKey="employmentStatus"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  {canViewPersonalIdentity ? (
-                    <SortableTh
-                      label="주민등록번호"
-                      sortKey="residentId"
-                      sorts={sorts}
-                      onToggle={toggleSort}
-                    />
-                  ) : null}
-                  <SortableTh
-                    label="성별"
-                    sortKey="gender"
-                    sorts={sorts}
-                    onToggle={toggleSort}
-                  />
-                  {canViewPersonalIdentity ? (
-                    <SortableTh
-                      label="생년월일"
-                      sortKey="birthDate"
-                      sorts={sorts}
-                      onToggle={toggleSort}
-                    />
-                  ) : null}
-                  {canViewPersonalIdentity ? (
-                    <SortableTh
-                      label="양/음"
-                      sortKey="calendarType"
-                      sorts={sorts}
-                      onToggle={toggleSort}
-                    />
-                  ) : null}
-                  {canViewPersonalIdentity ? (
-                    <SortableTh
-                      label="나이"
-                      sortKey="age"
-                      sorts={sorts}
-                      onToggle={toggleSort}
-                    />
-                  ) : null}
+                  {columnHeader("회사", "companyCode")}
+                  {columnHeader("부서", "departmentName")}
+                  {columnHeader("직책", "position")}
+                  {columnHeader("직급", "jobGrade")}
+                  {columnHeader("사원", "name")}
+                  {columnHeader("입사일", "hireDate")}
+                  {columnHeader("퇴사일", "resignDate")}
+                  {columnHeader("이메일", "email")}
+                  {columnHeader("사번", "empNo")}
+                  {columnHeader("사원구분", "empCategory")}
+                  {columnHeader("재직/퇴직구분", "employmentStatus")}
+                  {canViewPersonalIdentity
+                    ? columnHeader("주민등록번호", "residentId")
+                    : null}
+                  {columnHeader("성별", "gender")}
+                  {canViewPersonalIdentity
+                    ? columnHeader("생년월일", "birthDate")
+                    : null}
+                  {canViewPersonalIdentity
+                    ? columnHeader("양/음", "calendarType")
+                    : null}
+                  {canViewPersonalIdentity ? columnHeader("나이", "age") : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sortedEmployees.map((emp, index) => (
+                {displayedEmployees.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={14 + (canViewPersonalIdentity ? 4 : 0)}
+                      className="px-6 py-12 text-center text-sm text-slate-500"
+                    >
+                      필터와 일치하는 행이 없습니다.
+                    </td>
+                  </tr>
+                ) : null}
+                {displayedEmployees.map((emp, index) => (
                   <tr key={emp.id} className="hover:bg-slate-50/80">
                     <td className="whitespace-nowrap px-1.5 py-1.5 text-slate-400">
                       {index + 1}

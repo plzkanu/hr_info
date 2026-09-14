@@ -96,6 +96,9 @@ export function EmployeeDetailModal({
   hrCardBusy = false,
 }: EmployeeDetailModalProps) {
   useBackTrap(true, onClose);
+  const tabs = canViewPersonalIdentity
+    ? TABS
+    : TABS.filter((item) => item.id !== "education");
   const [tab, setTab] = useState<TabId>("profile");
   const initial = employee.name.trim().charAt(0) || employee.empNo.charAt(0);
   const isActive = employee.employmentStatus === "재직자";
@@ -171,8 +174,12 @@ export function EmployeeDetailModal({
           </button>
         </header>
 
-        <nav className="grid shrink-0 grid-cols-9 border-b border-slate-200 bg-[#F5F6F8]">
-          {TABS.map((item) => {
+        <nav
+          className={`grid shrink-0 border-b border-slate-200 bg-[#F5F6F8] ${
+            canViewPersonalIdentity ? "grid-cols-9" : "grid-cols-8"
+          }`}
+        >
+          {tabs.map((item) => {
             const active = tab === item.id;
             return (
               <button

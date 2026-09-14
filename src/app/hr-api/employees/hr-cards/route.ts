@@ -36,6 +36,7 @@ export async function POST(request: Request) {
         family: card.family.map((member) =>
           applyPersonalIdentityVisibility(member, allowed),
         ),
+        education: allowed ? card.education : [],
       })),
       truncated: keys.length > HR_CARD_MAX,
       max: HR_CARD_MAX,

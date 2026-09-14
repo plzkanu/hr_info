@@ -1,7 +1,17 @@
+import { NextResponse } from "next/server";
+import { requireApiSession } from "@/lib/api-auth";
 import { getEmployeeEducation } from "@/lib/education-store";
+import { canViewPersonalIdentity } from "@/lib/permissions";
 import { relatedEmployeeGet } from "@/lib/related-api";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  const sessionOrResponse = await requireApiSession();
+  if (sessionOrResponse instanceof NextResponse) return sessionOrResponse;
+
+  if (!canViewPersonalIdentity(sessionOrResponse.permissions)) {
+    return NextResponse.json({ rows: [] });
+  }
+
   return relatedEmployeeGet(
     request,
     getEmployeeEducation,
