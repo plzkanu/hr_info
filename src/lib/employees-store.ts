@@ -1,5 +1,5 @@
-import { createServerClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createHrDataClient } from "@/lib/supabase/server";
+import { isHrDataConfigured } from "@/lib/supabase/config";
 import { fetchAllRows, formatSupabaseNetworkError } from "@/lib/supabase/fetch";
 import { collectSubDepartmentNames, getAllDepartments } from "./departments";
 import {
@@ -130,7 +130,7 @@ const ROSTER_SELECT = [
 ].join(", ");
 
 function requireSupabase() {
-  if (!isSupabaseConfigured()) {
+  if (!isHrDataConfigured()) {
     throw new Error("Supabase가 설정되지 않았습니다.");
   }
 }
@@ -139,15 +139,36 @@ function rosterJobGrade(row: RosterRow): string {
   return (row.um_jp_name ?? "").trim();
 }
 
-function usesCompactRosterDates(company: CompanyCode): boolean {
-  const table = COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company);
-  return table === "ind_emp_roster";
+const compactDateCache = new Map<string, boolean>();
+
+async function rosterUsesCompactDates(
+  supabase: ReturnType<typeof createHrDataClient>,
+  table: string,
+): Promise<boolean> {
+  const cached = compactDateCache.get(table);
+  if (cached != null) return cached;
+
+  const { data, error } = await supabase
+    .from(table)
+    .select("ent_date")
+    .not("ent_date", "is", null)
+    .limit(20);
+  if (error) {
+    compactDateCache.set(table, false);
+    return false;
+  }
+  const sample = ((data ?? []) as { ent_date?: string | null }[])
+    .map((row) => (row.ent_date ?? "").trim())
+    .find((value) => value && !/^9+$/.test(value.replace(/[^0-9]/g, "")));
+  const compact = Boolean(sample) && /^\d{8}$/.test(sample);
+  compactDateCache.set(table, compact);
+  return compact;
 }
 
-function toRosterDateFilter(value: string, company: CompanyCode): string {
+function toRosterDateFilter(value: string, compact: boolean): string {
   const iso = formatDate(value);
   if (!iso) return value.trim();
-  return usesCompactRosterDates(company) ? iso.replace(/-/g, "") : iso;
+  return compact ? iso.replace(/-/g, "") : iso;
 }
 
 function inIsoDateRange(
@@ -227,9 +248,10 @@ async function searchOneCompany(
   filters: EmployeeFilters,
   company: CompanyCode,
 ): Promise<{ employees: Employee[]; rosterUnavailable: boolean }> {
-  const supabase = createServerClient();
+  const supabase = createHrDataClient();
   const table = COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company);
-  const asOfDate = filters.asOfDate || new Date().toISOString().slice(0, 10);
+  const asOfDate = filters.asOfDate || todayIsoDate();
+  const compactDates = await rosterUsesCompactDates(supabase, table);
 
   let subDepartmentNames: string[] | undefined;
   if (filters.departmentName && filters.includeSubDepartments) {
@@ -261,16 +283,28 @@ async function searchOneCompany(
       query = query.ilike("emp_name", `%${filters.empName}%`);
     }
     if (filters.hireDateFrom) {
-      query = query.gte("ent_date", toRosterDateFilter(filters.hireDateFrom, company));
+      query = query.gte(
+        "ent_date",
+        toRosterDateFilter(filters.hireDateFrom, compactDates),
+      );
     }
     if (filters.hireDateTo) {
-      query = query.lte("ent_date", toRosterDateFilter(filters.hireDateTo, company));
+      query = query.lte(
+        "ent_date",
+        toRosterDateFilter(filters.hireDateTo, compactDates),
+      );
     }
     if (filters.resignDateFrom) {
-      query = query.gte("retire_date", toRosterDateFilter(filters.resignDateFrom, company));
+      query = query.gte(
+        "retire_date",
+        toRosterDateFilter(filters.resignDateFrom, compactDates),
+      );
     }
     if (filters.resignDateTo) {
-      query = query.lte("retire_date", toRosterDateFilter(filters.resignDateTo, company));
+      query = query.lte(
+        "retire_date",
+        toRosterDateFilter(filters.resignDateTo, compactDates),
+      );
     }
     if (filters.nationalityType === "외국인") {
       query = query.eq("is_foreigner", "1");
@@ -395,7 +429,7 @@ function uniqueSorted(values: (string | null | undefined)[]) {
 async function getFilterOptionsFromTable(
   company: CompanyCode,
 ): Promise<EmployeeFilterOptions> {
-  const supabase = createServerClient();
+  const supabase = createHrDataClient();
   const { data, error } = await fetchAllRows<{
     um_emp_type_name: string | null;
     um_employ_type_name: string | null;
@@ -497,7 +531,7 @@ export async function getEmployeesByKeys(
   await Promise.all(
     [...grouped.entries()].map(async ([company, empNos]) => {
       const unique = [...new Set(empNos)];
-      const supabase = createServerClient();
+      const supabase = createHrDataClient();
       const table = COMPANY_ROSTER_TABLE[company] ?? rosterTableFor(company);
       for (let i = 0; i < unique.length; i += 100) {
         const chunk = unique.slice(i, i + 100);
@@ -540,8 +574,8 @@ function formatSyncedAtDate(value: string): string {
 const ROSTER_SYNC_TABLES = ["ens_emp_roster", "ind_emp_roster"] as const;
 
 export async function getLatestRosterSyncedAt(): Promise<string | null> {
-  if (!isSupabaseConfigured()) return null;
-  const supabase = createServerClient();
+  if (!isHrDataConfigured()) return null;
+  const supabase = createHrDataClient();
   const timestamps = (
     await Promise.all(
       ROSTER_SYNC_TABLES.map(async (table) => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { EmployeeAppointmentsPanel } from "@/components/employee-appointments-panel";
+import { EmployeeConstructionHistoryPanel } from "@/components/employee-construction-history-panel";
 import { EmployeeFamilyPanel } from "@/components/employee-family-panel";
 import {
   EmployeeCareerPanel,
@@ -22,6 +23,7 @@ const TABS = [
   { id: "certificate", label: "자격증" },
   { id: "language", label: "어학" },
   { id: "career", label: "경력" },
+  { id: "construction", label: "공사경력" },
   { id: "reward", label: "상벌" },
 ] as const;
 
@@ -176,7 +178,7 @@ export function EmployeeDetailModal({
 
         <nav
           className={`grid shrink-0 border-b border-slate-200 bg-[#F5F6F8] ${
-            canViewPersonalIdentity ? "grid-cols-9" : "grid-cols-8"
+            canViewPersonalIdentity ? "grid-cols-10" : "grid-cols-9"
           }`}
         >
           {tabs.map((item) => {
@@ -202,16 +204,18 @@ export function EmployeeDetailModal({
         </nav>
 
         <div
-          className={`min-h-0 flex-1 bg-[#F8F9FB] p-5 ${
-            tab === "appointment" ||
-            tab === "family" ||
-            tab === "education" ||
-            tab === "certificate" ||
-            tab === "language" ||
-            tab === "career" ||
-            tab === "reward"
-              ? "flex overflow-hidden"
-              : "overflow-y-auto"
+          className={`min-h-0 flex-1 bg-[#F8F9FB] ${
+            tab === "construction"
+              ? "flex overflow-hidden p-3"
+              : tab === "appointment" ||
+                  tab === "family" ||
+                  tab === "education" ||
+                  tab === "certificate" ||
+                  tab === "language" ||
+                  tab === "career" ||
+                  tab === "reward"
+                ? "flex overflow-hidden p-5"
+                : "overflow-y-auto p-5"
           }`}
         >
           {tab === "profile" ? (
@@ -260,6 +264,8 @@ export function EmployeeDetailModal({
             <EmployeeLanguagesPanel employee={employee} />
           ) : tab === "career" ? (
             <EmployeeCareerPanel employee={employee} />
+          ) : tab === "construction" ? (
+            <EmployeeConstructionHistoryPanel employee={employee} />
           ) : tab === "reward" ? (
             <EmployeeRewardPenaltyPanel employee={employee} />
           ) : (

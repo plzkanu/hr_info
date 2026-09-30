@@ -230,6 +230,22 @@ export interface EmployeeCareer {
   remark: string;
 }
 
+export interface EmployeeConstructionHistory {
+  key: string;
+  client: string;
+  powerPlant: string;
+  constructionType: string;
+  field: string;
+  position: string;
+  duty1: string;
+  duty2: string;
+  startDate: string | null;
+  endDate: string | null;
+  duration: string;
+  durationMonths: number;
+  notes: string;
+}
+
 export interface EmployeeLanguage {
   key: string;
   languageName: string;

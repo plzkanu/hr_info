@@ -1,5 +1,5 @@
-import { createServerClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createHrDataClient } from "@/lib/supabase/server";
+import { isHrDataConfigured } from "@/lib/supabase/config";
 import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
 import { getCompanyId } from "./companies-server";
 
@@ -22,7 +22,7 @@ export async function fetchRelatedRows<TRow, TMapped>({
   limit = 200,
   map,
 }: FetchRelatedRowsOptions<TRow, TMapped>): Promise<TMapped[]> {
-  if (!isSupabaseConfigured()) {
+  if (!isHrDataConfigured()) {
     throw new Error("Supabase가 설정되지 않았습니다.");
   }
 
@@ -31,7 +31,7 @@ export async function fetchRelatedRows<TRow, TMapped>({
     return [];
   }
 
-  const supabase = createServerClient();
+  const supabase = createHrDataClient();
   let query = supabase.from(table).select(columns).eq("emp_id", normalizedEmpNo);
 
   const companyId = await getCompanyId(company);

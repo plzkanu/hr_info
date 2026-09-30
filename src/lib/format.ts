@@ -37,6 +37,53 @@ export function formatYearMonth(value: string | null | undefined): string | null
   return trimmed;
 }
 
+export function parseDurationToMonths(
+  duration: string | null | undefined,
+): number | null {
+  const text = (duration ?? "").replace(/\s/g, "");
+  if (!text) return null;
+  const yearMonth = text.match(/^(\d+)년(\d+)개월$/);
+  if (yearMonth) {
+    return Number(yearMonth[1]) * 12 + Number(yearMonth[2]);
+  }
+  const yearsOnly = text.match(/^(\d+)년$/);
+  if (yearsOnly) return Number(yearsOnly[1]) * 12;
+  const monthsOnly = text.match(/^(\d+)개월$/);
+  if (monthsOnly) return Number(monthsOnly[1]);
+  return null;
+}
+
+export function monthsBetweenYearMonths(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): number | null {
+  const startDigits = (start ?? "").replace(/[^0-9]/g, "");
+  const endDigits = (end ?? "").replace(/[^0-9]/g, "");
+  if (startDigits.length < 6 || endDigits.length < 6) return null;
+  const startYear = Number(startDigits.slice(0, 4));
+  const startMonth = Number(startDigits.slice(4, 6));
+  const endYear = Number(endDigits.slice(0, 4));
+  const endMonth = Number(endDigits.slice(4, 6));
+  if (
+    !startYear ||
+    !endYear ||
+    startMonth < 1 ||
+    startMonth > 12 ||
+    endMonth < 1 ||
+    endMonth > 12
+  ) {
+    return null;
+  }
+  return Math.max(0, (endYear - startYear) * 12 + (endMonth - startMonth));
+}
+
+export function formatYearMonthDuration(totalMonths: number): string {
+  const months = Math.max(0, Math.round(totalMonths));
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return `${years}년 ${String(rest).padStart(2, "0")}개월`;
+}
+
 export function firstNonEmpty(
   ...values: (string | null | undefined)[]
 ): string {

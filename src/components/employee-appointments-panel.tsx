@@ -83,18 +83,18 @@ export function EmployeeAppointmentsPanel({
         </p>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[860px] text-left text-[13px]">
-          <thead className="sticky top-0 bg-slate-50 text-[11px] font-medium tracking-wide text-slate-500">
+        <table className="w-max min-w-full text-left text-[13px]">
+          <thead className="sticky top-0 bg-slate-50 text-[11px] font-medium text-slate-500">
             <tr>
-              <th className="px-3 py-2.5">발령일</th>
-              <th className="px-3 py-2.5">종료일</th>
-              <th className="px-3 py-2.5">발령명</th>
-              <th className="px-3 py-2.5">발령부서</th>
-              <th className="px-3 py-2.5">직급</th>
-              <th className="px-3 py-2.5">직종</th>
-              <th className="px-3 py-2.5">직무</th>
-              <th className="px-3 py-2.5">근무상태</th>
-              <th className="px-3 py-2.5">내용</th>
+              <th className="whitespace-nowrap px-3 py-2.5">발령일</th>
+              <th className="whitespace-nowrap px-3 py-2.5">종료일</th>
+              <th className="whitespace-nowrap px-3 py-2.5">발령명</th>
+              <th className="whitespace-nowrap px-3 py-2.5">발령부서</th>
+              <th className="whitespace-nowrap px-3 py-2.5">직급</th>
+              <th className="whitespace-nowrap px-3 py-2.5">직종</th>
+              <th className="whitespace-nowrap px-3 py-2.5">직무</th>
+              <th className="whitespace-nowrap px-3 py-2.5">근무상태</th>
+              <th className="whitespace-nowrap px-3 py-2.5">내용</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -118,7 +118,7 @@ export function EmployeeAppointmentsPanel({
                     ) : null}
                   </div>
                 </td>
-                <td className="px-3 py-2.5 text-slate-700">
+                <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
                   {row.orderDepartmentName || "-"}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
@@ -127,7 +127,7 @@ export function EmployeeAppointmentsPanel({
                 <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
                   {row.jobTypeName || "-"}
                 </td>
-                <td className="px-3 py-2.5 text-slate-700">
+                <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
                   {row.jobName || "-"}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">

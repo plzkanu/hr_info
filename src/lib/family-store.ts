@@ -1,5 +1,5 @@
-import { createServerClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createHrDataClient } from "@/lib/supabase/server";
+import { isHrDataConfigured } from "@/lib/supabase/config";
 import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
 import { getCompanyId } from "./companies-server";
 import { formatDate, isTruthyFlag } from "./format";
@@ -60,7 +60,7 @@ export async function getEmployeeFamily(
   empNo: string,
   company?: string,
 ): Promise<EmployeeFamilyMember[]> {
-  if (!isSupabaseConfigured()) {
+  if (!isHrDataConfigured()) {
     throw new Error("Supabase가 설정되지 않았습니다.");
   }
 
@@ -69,7 +69,7 @@ export async function getEmployeeFamily(
     return [];
   }
 
-  const supabase = createServerClient();
+  const supabase = createHrDataClient();
   let query = supabase
     .from("employee_family")
     .select(

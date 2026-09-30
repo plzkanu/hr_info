@@ -1,5 +1,5 @@
-import { createServerClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createHrDataClient } from "@/lib/supabase/server";
+import { isHrDataConfigured } from "@/lib/supabase/config";
 import { fetchAllRows, formatSupabaseNetworkError } from "@/lib/supabase/fetch";
 import {
   COMPANY_ROSTER_TABLE,
@@ -13,7 +13,7 @@ import { companiesForFilter } from "./companies-server";
 import type { Department } from "./types";
 
 function requireSupabase() {
-  if (!isSupabaseConfigured()) {
+  if (!isHrDataConfigured()) {
     throw new Error("Supabase가 설정되지 않았습니다.");
   }
 }
@@ -21,7 +21,7 @@ function requireSupabase() {
 async function getDepartmentsFromTable(
   company: CompanyCode,
 ): Promise<Department[]> {
-  const supabase = createServerClient();
+  const supabase = createHrDataClient();
   const { data, error } = await fetchAllRows<{
     dept_name: string | null;
     dept_full_name: string | null;

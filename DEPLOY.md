@@ -17,8 +17,10 @@
 | 변수 | 필수 | 설명 |
 |------|------|------|
 | `AUTH_SECRET` | 필수 | 세션 쿠키 서명 키. 운영에서는 반드시 임의 문자열로 바꿉니다. |
-| `NEXT_PUBLIC_SUPABASE_URL` | 필수 | Supabase Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | 필수 | Supabase Service Role 키 (anon 키가 아님) |
+| `NEXT_PUBLIC_SUPABASE_URL` | 필수 | hr_info Supabase Project URL (로그인·설정) |
+| `SUPABASE_SERVICE_ROLE_KEY` | 필수 | hr_info Service Role 키 (anon 키가 아님) |
+| `MANMANAGE_SUPABASE_URL` | 선택 | manmanage Project URL. 넣으면 사원·발령 등 인사 테이블을 여기서 조회합니다 |
+| `MANMANAGE_SUPABASE_SERVICE_ROLE_KEY` | 선택 | manmanage Service Role 키 |
 | `SUPABASE_SSL_VERIFY` | 선택 | 회사 VPN/방화벽 TLS 오류일 때만 `0` |
 
 Replit처럼 공개 HTTPS로 띄울 때는 보통 `SUPABASE_SSL_VERIFY`를 넣지 않습니다.
@@ -40,7 +42,7 @@ Supabase SQL Editor에서 `supabase/apply-all-migrations.sql`을 한 번 실행�
 ```bash
 git add -A
 git status
-git commit -m "뒤로가기 수정"
+git commit -m "권한 및 필터수정"
 git push origin main
 ```
 

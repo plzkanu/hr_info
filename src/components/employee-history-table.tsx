@@ -115,7 +115,7 @@ export function EmployeeHistoryTable<T extends { key: string }>({
           <thead className="sticky top-0 bg-slate-50 text-[11px] font-medium tracking-wide text-slate-500">
             <tr>
               {columns.map((column) => (
-                <th key={column.header} className="px-3 py-2.5">
+                <th key={column.header} className="whitespace-nowrap px-3 py-2.5">
                   {column.header}
                 </th>
               ))}
