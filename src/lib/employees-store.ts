@@ -160,7 +160,7 @@ async function rosterUsesCompactDates(
   const sample = ((data ?? []) as { ent_date?: string | null }[])
     .map((row) => (row.ent_date ?? "").trim())
     .find((value) => value && !/^9+$/.test(value.replace(/[^0-9]/g, "")));
-  const compact = Boolean(sample) && /^\d{8}$/.test(sample);
+  const compact = sample ? /^\d{8}$/.test(sample) : false;
   compactDateCache.set(table, compact);
   return compact;
 }
