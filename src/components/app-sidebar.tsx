@@ -8,11 +8,11 @@ import { ChangeOwnPasswordModal } from "@/components/change-own-password-modal";
 import { LogoutButton } from "@/components/logout-button";
 import { deployedAtLabel } from "@/lib/build-info";
 import { mainNavItems } from "@/lib/nav";
-import type { SessionUser } from "@/lib/types";
+import type { RosterSyncStatus, SessionUser } from "@/lib/types";
 
 interface AppSidebarProps {
   user: SessionUser;
-  rosterSyncedAt?: string | null;
+  rosterSyncStatuses?: RosterSyncStatus[];
 }
 
 const NAV_ICONS: Record<string, string> = {
@@ -30,7 +30,7 @@ function isNavActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar({ user, rosterSyncedAt }: AppSidebarProps) {
+export function AppSidebar({ user, rosterSyncStatuses = [] }: AppSidebarProps) {
   const pathname = usePathname();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const items = mainNavItems.filter(
@@ -91,12 +91,20 @@ export function AppSidebar({ user, rosterSyncedAt }: AppSidebarProps) {
       </nav>
 
       <div className="border-t border-white/8 px-[18px] py-3.5">
-        {rosterSyncedAt ? (
-          <p className="mb-3 text-[11px] leading-4 text-[#BCC0C8]">
-            사원명부 업데이트
-            <br />
-            <span className="text-white/80">{rosterSyncedAt}</span>
-          </p>
+        {rosterSyncStatuses.length > 0 ? (
+          <div className="mb-3 text-[11px] leading-4 text-[#BCC0C8]">
+            <p>사원명부 업데이트</p>
+            <ul className="mt-1 space-y-0.5">
+              {rosterSyncStatuses.map((item) => (
+                <li key={item.code} className="flex items-baseline justify-between gap-2">
+                  <span>{item.code}</span>
+                  <span className={item.ok ? "text-white/80" : "text-red-300"}>
+                    {item.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         <button
           type="button"

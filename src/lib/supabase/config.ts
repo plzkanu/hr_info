@@ -15,9 +15,9 @@ export function isManmanageConfigured() {
   );
 }
 
-/** 사원명부·발령 등 인사 원천. manmanage가 있으면 그쪽을 씁니다. */
+/** 사원명부·발령 등. hr_info Supabase가 필요합니다. */
 export function isHrDataConfigured() {
-  return isManmanageConfigured() || isSupabaseConfigured();
+  return isSupabaseConfigured();
 }
 
 export function getSupabaseConfigError() {

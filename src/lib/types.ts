@@ -153,6 +153,12 @@ export interface EmployeeFilterOptions {
   genders: string[];
 }
 
+export interface RosterSyncStatus {
+  code: string;
+  ok: boolean;
+  label: string;
+}
+
 export interface EmployeeAppointment {
   key: string;
   empNo: string;

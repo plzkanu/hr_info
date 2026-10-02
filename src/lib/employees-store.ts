@@ -1,5 +1,5 @@
-import { createHrDataClient } from "@/lib/supabase/server";
-import { isHrDataConfigured } from "@/lib/supabase/config";
+import { createHrDataClient, createServerClient } from "@/lib/supabase/server";
+import { isHrDataConfigured, isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchAllRows, formatSupabaseNetworkError } from "@/lib/supabase/fetch";
 import { collectSubDepartmentNames, getAllDepartments } from "./departments";
 import {
@@ -27,6 +27,7 @@ import type {
   Employee,
   EmployeeFilterOptions,
   EmployeeFilters,
+  RosterSyncStatus,
 } from "./types";
 
 export interface RosterRow {
@@ -571,34 +572,43 @@ function formatSyncedAtDate(value: string): string {
   }).format(date);
 }
 
-const ROSTER_SYNC_TABLES = ["ens_emp_roster", "ind_emp_roster"] as const;
+export async function getRosterSyncStatuses(): Promise<RosterSyncStatus[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from("erp_hr_sync_status")
+    .select("company_id, status, last_success_at");
 
-export async function getLatestRosterSyncedAt(): Promise<string | null> {
-  if (!isHrDataConfigured()) return null;
-  const supabase = createHrDataClient();
-  const timestamps = (
-    await Promise.all(
-      ROSTER_SYNC_TABLES.map(async (table) => {
-        const { data, error } = await supabase
-          .from(table)
-          .select("synced_at")
-          .order("synced_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (error) {
-          if (isMissingRosterTable(error.message)) return null;
-          return null;
-        }
-        const syncedAt = (data as { synced_at?: string | null } | null)
-          ?.synced_at;
-        return syncedAt?.trim() || null;
-      }),
-    )
-  ).filter((value): value is string => Boolean(value));
+  if (error || !data?.length) return [];
 
-  if (timestamps.length === 0) return null;
-  timestamps.sort();
-  return formatSyncedAtDate(timestamps[timestamps.length - 1]);
+  const companies = await getCompanies();
+  const byId = new Map(companies.map((item) => [item.id, item.code]));
+  const rows = data.map((row) => {
+    const companyId = Number((row as { company_id?: number }).company_id);
+    const status = String((row as { status?: string }).status ?? "")
+      .trim()
+      .toUpperCase();
+    const successAt = (row as { last_success_at?: string | null })
+      .last_success_at;
+    const ok = status === "SUCCESS";
+    return {
+      code: byId.get(companyId) || String(companyId),
+      ok,
+      label: ok
+        ? successAt
+          ? formatSyncedAtDate(successAt)
+          : "연동성공"
+        : "연동실패",
+    };
+  });
+
+  const order = new Map<string, number>([
+    ["IND", 0],
+    ["ENS", 1],
+  ]);
+  return rows.sort(
+    (a, b) => (order.get(a.code) ?? 99) - (order.get(b.code) ?? 99),
+  );
 }
 
 

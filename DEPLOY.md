@@ -19,7 +19,7 @@
 | `AUTH_SECRET` | 필수 | 세션 쿠키 서명 키. 운영에서는 반드시 임의 문자열로 바꿉니다. |
 | `NEXT_PUBLIC_SUPABASE_URL` | 필수 | hr_info Supabase Project URL (로그인·설정) |
 | `SUPABASE_SERVICE_ROLE_KEY` | 필수 | hr_info Service Role 키 (anon 키가 아님) |
-| `MANMANAGE_SUPABASE_URL` | 선택 | manmanage Project URL. 넣으면 사원·발령 등 인사 테이블을 여기서 조회합니다 |
+| `MANMANAGE_SUPABASE_URL` | 선택 | manmanage Project URL. 공사경력(`employee_construction_history`) 조회용 |
 | `MANMANAGE_SUPABASE_SERVICE_ROLE_KEY` | 선택 | manmanage Service Role 키 |
 | `SUPABASE_SSL_VERIFY` | 선택 | 회사 VPN/방화벽 TLS 오류일 때만 `0` |
 
@@ -193,7 +193,7 @@ GitHub `main`을 다시 받으면 `.replit` 값이 대시보드 설정을 덮습
 
 ```bash
 git add -A
-git commit -m "변경 내용을 한 줄로"
+git commit -m "공사경력추가"
 git push origin main
 ```
 
@@ -209,3 +209,14 @@ node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
 `origin`이 이미 있으면 `git remote add` 줄은 건너뛰거나, 주소만 고칠 때 `git remote set-url origin https://github.com/plzkanu/hr_info.git` 을 씁니다.
 
 스키마를 바꿨으면 Supabase에서 `apply-all-migrations.sql`도 다시 실행합니다.
+
+
+```bash
+git add -A
+git status
+git commit -m "공사경력추가2"
+git push origin main
+
+
+```bash
+git fetch origin main && git reset --hard origin/main && npm install && node scripts/build-prod.mjs

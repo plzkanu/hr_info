@@ -37,7 +37,7 @@ export function createServerClient(): SupabaseClient {
   );
 }
 
-/** manmanage 프로젝트. 사원명부·발령 등 인사 원천 테이블 */
+/** manmanage 프로젝트. 공사경력 등 manmanage 전용 테이블 */
 export function createManmanageClient(): SupabaseClient {
   if (!isManmanageConfigured()) {
     throw new Error(
@@ -51,10 +51,7 @@ export function createManmanageClient(): SupabaseClient {
   );
 }
 
-/** 인사 데이터 조회. manmanage 키가 있으면 그쪽, 없으면 기존 hr_info */
+/** 사원명부·발령·가족 등. ens_emp_roster 는 hr_info에 있습니다. */
 export function createHrDataClient(): SupabaseClient {
-  if (isManmanageConfigured()) {
-    return createManmanageClient();
-  }
   return createServerClient();
 }

@@ -3,7 +3,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { IdleTimeoutWatcher } from "@/components/idle-timeout-watcher";
 import { NavigationGuard } from "@/components/navigation-guard";
 import { getSessionUser } from "@/lib/auth";
-import { getLatestRosterSyncedAt } from "@/lib/employees-store";
+import { getRosterSyncStatuses } from "@/lib/employees-store";
+import type { RosterSyncStatus } from "@/lib/types";
 
 export default async function DashboardLayout({
   children,
@@ -15,18 +16,18 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  let rosterSyncedAt: string | null = null;
+  let rosterSyncStatuses: RosterSyncStatus[] = [];
   try {
-    rosterSyncedAt = await getLatestRosterSyncedAt();
+    rosterSyncStatuses = await getRosterSyncStatuses();
   } catch {
-    rosterSyncedAt = null;
+    rosterSyncStatuses = [];
   }
 
   return (
     <NavigationGuard>
       <div className="dashboard-shell h-screen overflow-hidden bg-[#F5F6F8]">
         <IdleTimeoutWatcher />
-        <AppSidebar user={user} rosterSyncedAt={rosterSyncedAt} />
+        <AppSidebar user={user} rosterSyncStatuses={rosterSyncStatuses} />
         <main className="print-main ml-[220px] flex h-screen flex-col overflow-hidden p-7">
           {children}
         </main>
