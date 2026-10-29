@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { attachSessionCookie, getSessionUser } from "@/lib/auth";
+import { attachSessionCookie, getSessionState } from "@/lib/auth";
 
 export async function POST() {
-  const session = await getSessionUser();
-  if (!session) {
+  const state = await getSessionState();
+  if (!state) {
     return NextResponse.json(
       { error: "로그인이 필요합니다." },
       { status: 401 },
@@ -12,8 +12,8 @@ export async function POST() {
 
   const response = NextResponse.json({
     ok: true,
-    user: session,
+    user: state.user,
   });
 
-  return attachSessionCookie(response, session);
+  return attachSessionCookie(response, state.user, state.claims);
 }

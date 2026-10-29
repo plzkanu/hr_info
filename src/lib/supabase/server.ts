@@ -25,7 +25,7 @@ function createConfiguredClient(url: string, key: string): SupabaseClient {
   });
 }
 
-/** hr_info 프로젝트. 로그인 계정·앱 설정·회사구분 */
+/** hr_info 프로젝트. 서버 전용 service_role(RLS 우회). 브라우저에 키를 넣지 않습니다. */
 export function createServerClient(): SupabaseClient {
   if (!isSupabaseConfigured()) {
     throw new Error(getSupabaseConfigError() ?? "Supabase 설정이 없습니다.");

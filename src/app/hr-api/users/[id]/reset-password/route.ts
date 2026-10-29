@@ -7,7 +7,7 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-/** 관리자: 사용자 비밀번호를 아이디+"!!"로 초기화 */
+/** 관리자: 사용자 비밀번호를 임의 임시값으로 초기화 */
 export async function POST(_request: Request, context: RouteContext) {
   const sessionOrResponse = await requireApiAdmin();
   if (sessionOrResponse instanceof NextResponse) return sessionOrResponse;

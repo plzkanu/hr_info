@@ -48,8 +48,7 @@ export function getManmanageConfigError() {
   return `다음 환경 변수가 필요합니다: ${missing.join(", ")}`;
 }
 
-/** 회사 VPN/방화벽에서 인증서 폐기 목록(OCSP) 검사 실패 시 Supabase 연결용 */
-export function isSupabaseTlsInsecure(): boolean {
+function tlsVerifyDisabledInEnv(): boolean {
   const key = process.env.SUPABASE_SSL_VERIFY;
   if (key === undefined) return false;
   const normalized = key.trim().toLowerCase();
@@ -59,4 +58,22 @@ export function isSupabaseTlsInsecure(): boolean {
     normalized === "no" ||
     normalized === "off"
   );
+}
+
+/** 운영(NODE_ENV=production)에서는 인증서 검증을 우회하지 않습니다. */
+export function isSupabaseTlsInsecure(): boolean {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+  return tlsVerifyDisabledInEnv();
+}
+
+export function warnIfProductionTlsBypassRequested() {
+  if (process.env.NODE_ENV !== "production") return;
+  delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  if (tlsVerifyDisabledInEnv()) {
+    console.warn(
+      "[tls] 운영에서 SUPABASE_SSL_VERIFY 우회 설정은 무시합니다. 인증서를 검증합니다.",
+    );
+  }
 }

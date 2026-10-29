@@ -1,7 +1,25 @@
 import { NextResponse } from "next/server";
 import { attachSessionCookie } from "@/lib/auth";
+import {
+  LOGIN_MAX_PER_ACCOUNT,
+  LOGIN_MAX_PER_IP,
+  LOGIN_WINDOW_MS,
+  clientKey,
+  consumeRateLimit,
+  resetRateLimit,
+} from "@/lib/rate-limit";
 import { toSessionUser } from "@/lib/types";
 import { completeForcedPasswordChange } from "@/lib/users-store";
+
+function tooManyAttempts(retryAfterSec: number) {
+  return NextResponse.json(
+    { error: "시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+    {
+      status: 429,
+      headers: { "Retry-After": String(retryAfterSec) },
+    },
+  );
+}
 
 /** 초기화 비밀번호 로그인 후 강제 변경 (세션 없이) */
 export async function POST(request: Request) {
@@ -31,11 +49,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const accountKey = clientKey(request, `pwchange:${userId}`);
+    const ipKey = clientKey(request, "pwchange");
+    const accountLimit = consumeRateLimit(
+      accountKey,
+      LOGIN_MAX_PER_ACCOUNT,
+      LOGIN_WINDOW_MS,
+    );
+    const ipLimit = consumeRateLimit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
+    if (!accountLimit.ok) return tooManyAttempts(accountLimit.retryAfterSec);
+    if (!ipLimit.ok) return tooManyAttempts(ipLimit.retryAfterSec);
+
     const user = await completeForcedPasswordChange(
       userId,
       currentPassword,
       newPassword,
     );
+
+    resetRateLimit(accountKey);
+    resetRateLimit(ipKey);
+    resetRateLimit(clientKey(request, `login:${userId}`));
+    resetRateLimit(clientKey(request, "login"));
 
     const session = toSessionUser(user);
 

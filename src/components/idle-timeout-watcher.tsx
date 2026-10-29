@@ -15,6 +15,8 @@ const ACTIVITY_EVENTS: (keyof DocumentEventMap)[] = [
   "wheel",
 ];
 
+const HEARTBEAT_MS = 15_000;
+
 async function logout() {
   await fetch(hrApi("/auth/logout"), { method: "POST", keepalive: true });
 }
@@ -27,6 +29,7 @@ export function IdleTimeoutWatcher() {
   const [isExtending, setIsExtending] = useState(false);
 
   const lastActivityRef = useRef(Date.now());
+  const lastHeartbeatRef = useRef(0);
   const warningShownRef = useRef(false);
   const loggingOutRef = useRef(false);
   const graceDeadlineRef = useRef<number | null>(null);
@@ -34,6 +37,12 @@ export function IdleTimeoutWatcher() {
   const loadSettings = useCallback(async () => {
     try {
       const response = await fetch(hrApi("/session/idle-timeout"));
+      if (response.status === 401) {
+        await logout();
+        router.push("/login?reason=idle");
+        router.refresh();
+        return;
+      }
       if (!response.ok) return;
       const data = (await response.json()) as {
         settings?: IdleTimeoutSettings;
@@ -44,7 +53,7 @@ export function IdleTimeoutWatcher() {
     } catch {
       // 설정 조회 실패 시 타임아웃 감시 생략
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void loadSettings();
@@ -71,16 +80,25 @@ export function IdleTimeoutWatcher() {
     }
   }, [router]);
 
+  const heartbeat = useCallback(async () => {
+    try {
+      const response = await fetch(hrApi("/auth/extend"), { method: "POST" });
+      if (response.status === 401) {
+        await performLogout();
+        return false;
+      }
+      lastHeartbeatRef.current = Date.now();
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, [performLogout]);
+
   const extendSession = useCallback(async () => {
     setIsExtending(true);
     try {
-      await fetch(hrApi("/auth/extend"), { method: "POST" });
-      lastActivityRef.current = Date.now();
-      warningShownRef.current = false;
-      graceDeadlineRef.current = null;
-      setShowWarning(false);
-      setGraceRemaining(0);
-    } catch {
+      const ok = await heartbeat();
+      if (!ok) return;
       lastActivityRef.current = Date.now();
       warningShownRef.current = false;
       graceDeadlineRef.current = null;
@@ -89,7 +107,7 @@ export function IdleTimeoutWatcher() {
     } finally {
       setIsExtending(false);
     }
-  }, []);
+  }, [heartbeat]);
 
   useEffect(() => {
     if (!settings || settings.idleTimeoutMinutes <= 0) return;
@@ -101,6 +119,10 @@ export function IdleTimeoutWatcher() {
       if (now < throttleUntil) return;
       throttleUntil = now + 1000;
       lastActivityRef.current = now;
+      if (now - lastHeartbeatRef.current >= HEARTBEAT_MS) {
+        lastHeartbeatRef.current = now;
+        void heartbeat();
+      }
     }
 
     for (const eventName of ACTIVITY_EVENTS) {
@@ -111,7 +133,7 @@ export function IdleTimeoutWatcher() {
         document.removeEventListener(eventName, onActivity);
       }
     };
-  }, [settings]);
+  }, [heartbeat, settings]);
 
   useEffect(() => {
     if (!settings || settings.idleTimeoutMinutes <= 0) return;

@@ -16,24 +16,24 @@
 
 | 변수 | 필수 | 설명 |
 |------|------|------|
-| `AUTH_SECRET` | 필수 | 세션 쿠키 서명 키. 운영에서는 반드시 임의 문자열로 바꿉니다. |
+| `AUTH_SECRET` | 필수 | 세션 쿠키 서명 키. 16자 이상 임의 문자열. 없거나 예시값이면 서버가 기동하지 않습니다. |
 | `NEXT_PUBLIC_SUPABASE_URL` | 필수 | hr_info Supabase Project URL (로그인·설정) |
 | `SUPABASE_SERVICE_ROLE_KEY` | 필수 | hr_info Service Role 키 (anon 키가 아님) |
 | `MANMANAGE_SUPABASE_URL` | 선택 | manmanage Project URL. 공사경력(`employee_construction_history`) 조회용 |
 | `MANMANAGE_SUPABASE_SERVICE_ROLE_KEY` | 선택 | manmanage Service Role 키 |
-| `SUPABASE_SSL_VERIFY` | 선택 | 회사 VPN/방화벽 TLS 오류일 때만 `0` |
+| `SUPABASE_SSL_VERIFY` | 넣지 않음 | 운영에서는 사용하지 않습니다. `NODE_ENV=production`이면 `0`이어도 인증서를 검증합니다. |
 
-Replit처럼 공개 HTTPS로 띄울 때는 보통 `SUPABASE_SSL_VERIFY`를 넣지 않습니다.
+Replit Secrets에 `SUPABASE_SSL_VERIFY`와 `NODE_TLS_REJECT_UNAUTHORIZED`를 넣지 마세요.
 
 ### 데이터베이스
 
-Supabase SQL Editor에서 `supabase/apply-all-migrations.sql`을 한 번 실행합니다.
+Supabase SQL Editor에서 `supabase/apply-all-migrations.sql`을 한 번 실행합니다. 이 스크립트는 앱 테이블에 RLS를 켜고 `anon`/`authenticated` 권한을 회수합니다. 앱은 서버의 Service Role만 사용합니다.
 
 이미 운영 DB에 테이블이 있으면 다시 실행해도 `CREATE TABLE IF NOT EXISTS` / `ON CONFLICT DO NOTHING`이라 기존 데이터는 유지됩니다. 스키마를 바꾼 뒤에만 다시 실행하면 됩니다.
 
 사원·발령·가족 등 인사 데이터는 ERP에서 동기화된 기존 테이블을 사용합니다. 앱이 이 데이터를 새로 만들지 않습니다.
 
-초기 관리자: `hradmin` / `hradmin!!` (첫 로그인 시 비밀번호 변경 필수)
+최초 관리자는 문서에 비밀번호를 적지 않습니다. 계정이 비어 있으면 `node scripts/bootstrap-admin.mjs`로 생성하고, 출력된 임시 비밀번호로 로그인한 뒤 즉시 변경합니다. 기존 `hradmin` / `아이디!!` 조합은 쓰지 마세요. 아직 그 패턴이면 비밀번호를 바꾸거나 초기화하세요.
 
 ## 2. GitHub에 올리기
 
@@ -156,7 +156,7 @@ node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
 
 3. Replit **Publish / Deployment** 설정에서
    - Deployment type: Reserved VM
-   - Runtime: Node 24
+   - Runtime: Node 24 (`nodejs-24`). 셸에서 `node -v`가 **v24.22.1 이상**인지 확인합니다. 더 낮으면 Node2Shell 패치 전이므로 런타임을 갱신한 뒤 다시 빌드합니다.
    - Build command: `node scripts/build-prod.mjs` (`npm run build` 아님)
    - Run command: `node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000`
    - Health check path: `/` 또는 `/hr-api/health`
@@ -165,7 +165,7 @@ node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
 GitHub `main`을 다시 받으면 `.replit` 값이 대시보드 설정을 덮습니다. 3000 단일 매핑이 `.replit`에 있어야 1104 충돌이 되살아나지 않습니다.
 
 `.replit`의 `[env]`에 `NODE_ENV=production`을 넣지 않습니다. 넣으면 패키지 설치 때 Tailwind 등 빌드 의존성이 빠져 `@tailwindcss/postcss`를 못 찾습니다.
-4. Replit Secrets에 넣을 값은 `AUTH_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 입니다. `SUPABASE_SSL_VERIFY`나 `NODE_TLS_REJECT_UNAUTHORIZED`는 **없어도 됩니다.** 로그에 TLS 경고가 보여도 Secrets에 그 키가 없으면 무시해도 됩니다.
+4. Replit Secrets에 넣을 값은 `AUTH_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 입니다. `SUPABASE_SSL_VERIFY`와 `NODE_TLS_REJECT_UNAUTHORIZED`는 넣지 않습니다.
 
 헬스체크가 통과하는 주소:
 
@@ -175,6 +175,7 @@ GitHub `main`을 다시 받으면 `.replit` 값이 대시보드 설정을 덮습
 
 ## 4. 배포 후 확인
 
+- 셸에서 `node -v`가 v24.22.1 이상이다.
 - `/login`에서 로그인된다.
 - 브라우저 네트워크에 `/hr-api/auth/login`이 200으로 보인다. (`/api/auth/login`이 아님)
 - 사원명부 조회가 된다.

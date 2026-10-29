@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS employee_app_settings (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE employee_app_settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_app_settings ENABLE ROW LEVEL SECURITY;
 
 INSERT INTO employee_app_settings (key, value) VALUES
   ('idle_timeout_minutes', '30')

@@ -3,20 +3,5 @@
 ALTER TABLE employee_users
   ADD COLUMN IF NOT EXISTS password_must_change boolean NOT NULL DEFAULT false;
 
-INSERT INTO employee_users (id, name, password_hash, role, department, active, password_must_change) VALUES
-  (
-    'hradmin',
-    '시스템 관리자',
-    '$2b$10$BNsCYpx2inA4D82y7jNdAeZl1tQg8MRRgcXc7GwCDYtXxgNqwpS.u',
-    'admin',
-    '경영지원팀',
-    true,
-    true
-  )
-ON CONFLICT (id) DO NOTHING;
-
-UPDATE employee_users
-SET password_must_change = true
-WHERE id = 'hradmin';
-
+-- 고정 비밀번호 시드는 폐기했습니다. 최초 관리자는 node scripts/bootstrap-admin.mjs 로 생성하세요.
 DELETE FROM employee_users WHERE id = 'admin';

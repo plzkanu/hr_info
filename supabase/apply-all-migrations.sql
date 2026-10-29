@@ -45,25 +45,9 @@ ALTER TABLE employee_users
 
 CREATE INDEX IF NOT EXISTS employee_users_role_idx ON employee_users (role);
 CREATE INDEX IF NOT EXISTS employee_users_active_idx ON employee_users (active);
-ALTER TABLE employee_users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_users ENABLE ROW LEVEL SECURITY;
 
--- 초기 관리자: hradmin / hradmin!! (첫 로그인 시 비밀번호 변경 필수)
-INSERT INTO employee_users (id, name, password_hash, role, department, active, password_must_change) VALUES
-  (
-    'hradmin',
-    '시스템 관리자',
-    '$2b$10$BNsCYpx2inA4D82y7jNdAeZl1tQg8MRRgcXc7GwCDYtXxgNqwpS.u',
-    'admin',
-    '경영지원팀',
-    true,
-    true
-  )
-ON CONFLICT (id) DO NOTHING;
-
-UPDATE employee_users
-SET password_must_change = true
-WHERE id = 'hradmin';
-
+-- 최초 관리자는 고정 비밀번호로 넣지 않습니다. node scripts/bootstrap-admin.mjs 로 생성하세요.
 DELETE FROM employee_users WHERE id = 'admin';
 
 CREATE TABLE IF NOT EXISTS employee_app_settings (
@@ -72,7 +56,7 @@ CREATE TABLE IF NOT EXISTS employee_app_settings (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE employee_app_settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_app_settings ENABLE ROW LEVEL SECURITY;
 
 INSERT INTO employee_app_settings (key, value) VALUES
   ('idle_timeout_minutes', '30')
@@ -454,5 +438,42 @@ ALTER TABLE public.employee_career ADD COLUMN IF NOT EXISTS company_id integer;
 ALTER TABLE public.employee_languages ADD COLUMN IF NOT EXISTS company_id integer;
 ALTER TABLE public.employee_reward_penalty ADD COLUMN IF NOT EXISTS company_id integer;
 ALTER TABLE public.employee_licenses ADD COLUMN IF NOT EXISTS company_id integer;
+
+-- 앱은 서버의 service_role만 사용합니다. anon/authenticated 직접 접근을 막습니다.
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'employee_users',
+    'employee_app_settings',
+    'soosan_companies',
+    'employee_appointments',
+    'employee_family',
+    'employee_education',
+    'employee_career',
+    'employee_languages',
+    'employee_reward_penalty',
+    'employee_licenses',
+    'ens_emp_roster',
+    'ind_emp_roster',
+    'erp_hr_sync_status'
+  ]
+  LOOP
+    IF to_regclass('public.' || t) IS NULL THEN
+      CONTINUE;
+    END IF;
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    BEGIN
+      EXECUTE format(
+        'REVOKE ALL ON TABLE public.%I FROM anon, authenticated',
+        t
+      );
+    EXCEPTION
+      WHEN undefined_object THEN
+        NULL;
+    END;
+  END LOOP;
+END $$;
 
 NOTIFY pgrst, 'reload schema';

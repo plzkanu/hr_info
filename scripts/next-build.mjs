@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import "./assert-node-version.mjs";
 import { nextCli } from "./node-paths.mjs";
 
 function run(command, args, env = process.env) {

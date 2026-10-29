@@ -180,7 +180,7 @@ export function AccountManagement({ currentUserId }: AccountManagementProps) {
     }
     if (
       !confirm(
-        `'${user.id}' 계정의 비밀번호를 '${user.id}!!' 로 초기화하시겠습니까?\n해당 사용자는 다음 로그인 시 비밀번호를 반드시 변경해야 합니다.`,
+        `'${user.id}' 계정의 비밀번호를 임의 임시값으로 초기화하시겠습니까?\n임시 비밀번호는 한 번만 표시됩니다. 해당 사용자는 다음 로그인 시 비밀번호를 반드시 변경해야 합니다.`,
       )
     ) {
       return;
@@ -383,7 +383,7 @@ export function AccountManagement({ currentUserId }: AccountManagementProps) {
             </h2>
             {formMode === "create" ? (
               <p className="mt-2 text-xs text-slate-500">
-                임시 비밀번호는 아이디에 !! 를 붙인 값입니다. 첫 로그인 시
+                저장 후 임의 임시 비밀번호가 한 번 표시됩니다. 첫 로그인 시
                 비밀번호를 반드시 변경해야 합니다.
               </p>
             ) : null}

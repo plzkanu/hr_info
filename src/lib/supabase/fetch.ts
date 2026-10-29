@@ -60,10 +60,10 @@ export function formatSupabaseNetworkError(message: string): string {
     normalized.includes("enotfound") ||
     normalized.includes("timeout")
   ) {
-    return (
-      "Supabase에 연결할 수 없습니다. 회사 VPN/방화벽 환경이면 .env.local에 " +
-      "SUPABASE_SSL_VERIFY=0을 추가한 뒤 개발 서버를 재시작하세요."
-    );
+    return process.env.NODE_ENV === "production"
+      ? "Supabase에 연결할 수 없습니다. 운영에서는 TLS 검증을 끄지 마세요. 네트워크와 인증서를 확인하세요."
+      : "Supabase에 연결할 수 없습니다. 회사 VPN/방화벽이 인증서 검사를 막는 개발 PC에서만 " +
+        "SUPABASE_SSL_VERIFY=0을 쓸 수 있습니다. 운영(Replit)에는 넣지 마세요.";
   }
   return message;
 }
@@ -140,8 +140,8 @@ function nodeInsecureFetch(
 }
 
 /**
- * SUPABASE_SSL_VERIFY=0 일 때 인증서 검증만 생략합니다.
- * npm undici는 Replit Node에서 markAsUncloneable 오류를 냅니다.
+ * 개발에서만 SUPABASE_SSL_VERIFY=0 일 때 인증서 검증을 생략합니다.
+ * 운영(NODE_ENV=production)에서는 항상 기본 fetch를 씁니다.
  */
 export function getSupabaseFetch(): typeof globalThis.fetch {
   if (!isSupabaseTlsInsecure()) {

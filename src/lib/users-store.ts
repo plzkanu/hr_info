@@ -1,12 +1,24 @@
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatSupabaseNetworkError } from "@/lib/supabase/fetch";
-import { initialPassword, validateNewPassword } from "./password";
+import { validateNewPassword } from "./password";
 import { sanitizePermissions } from "./permissions";
 import type { User, UserRole } from "./types";
 
-const DEFAULT_ADMIN_ID = "hradmin";
+function generateTemporaryPassword() {
+  return randomBytes(18).toString("base64url");
+}
+
+let dummyPasswordHash: string | null = null;
+
+async function dummyPasswordCompare(password: string) {
+  if (!dummyPasswordHash) {
+    dummyPasswordHash = await bcrypt.hash("not-a-real-user", 10);
+  }
+  await bcrypt.compare(password, dummyPasswordHash);
+}
 
 interface EmployeeUserRow {
   id: string;
@@ -43,40 +55,8 @@ function requireSupabase() {
   }
 }
 
-async function seedDefaultAdminIfEmpty(): Promise<void> {
-  const supabase = createServerClient();
-  const { count, error: countError } = await supabase
-    .from("employee_users")
-    .select("*", { count: "exact", head: true });
-
-  if (countError) {
-    throw new Error(formatSupabaseNetworkError(countError.message));
-  }
-
-  if ((count ?? 0) > 0) {
-    return;
-  }
-
-  const passwordHash = await bcrypt.hash(initialPassword(DEFAULT_ADMIN_ID), 10);
-  const { error } = await supabase.from("employee_users").insert({
-    id: DEFAULT_ADMIN_ID,
-    name: "시스템 관리자",
-    password_hash: passwordHash,
-    role: "admin",
-    department: "경영지원팀",
-    active: true,
-    password_must_change: true,
-    permissions: [],
-  });
-
-  if (error) {
-    throw new Error(formatSupabaseNetworkError(error.message));
-  }
-}
-
 export async function getAllUsers(): Promise<User[]> {
   requireSupabase();
-  await seedDefaultAdminIfEmpty();
 
   const supabase = createServerClient();
   const { data, error } = await supabase
@@ -113,10 +93,10 @@ export async function verifyUserCredentials(
   password: string,
 ): Promise<User | null> {
   requireSupabase();
-  await seedDefaultAdminIfEmpty();
 
   const user = await findUserById(id.trim().toLowerCase());
   if (!user || !user.active) {
+    await dummyPasswordCompare(password);
     return null;
   }
   const valid = await bcrypt.compare(password, user.passwordHash);
@@ -151,7 +131,7 @@ export async function createUser(
     throw new Error("이미 사용 중인 아이디입니다.");
   }
 
-  const temporaryPassword = initialPassword(normalizedId);
+  const temporaryPassword = generateTemporaryPassword();
   const passwordHash = await bcrypt.hash(temporaryPassword, 10);
   const supabase = createServerClient();
   const { data, error } = await supabase
@@ -270,7 +250,7 @@ export async function resetUserPassword(
     throw new Error("계정을 찾을 수 없습니다.");
   }
 
-  const temporaryPassword = initialPassword(user.id);
+  const temporaryPassword = generateTemporaryPassword();
   const passwordHash = await bcrypt.hash(temporaryPassword, 10);
   const supabase = createServerClient();
   const { error } = await supabase
